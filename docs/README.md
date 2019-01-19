@@ -3,6 +3,8 @@
 The VATSIM UK Controller Plugin for EuroCcope 3.2 only. This project works in cooperation with
 the Plugin API to offer useful functionality to controllers of UK positions on the VATSIM network.
 
+[https://ci.appveyor.com/api/projects/status/github/VATSIM-UK/uk-controller-plugin?svg=true&retina=true](https://ci.appveyor.com/api/projects/status/github/VATSIM-UK/uk-controller-plugin?svg=true&retina=true)
+
 ## Feature List
 
 - Open Source Plugin and API Code
