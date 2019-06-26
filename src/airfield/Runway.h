@@ -13,6 +13,10 @@ namespace UKControllerPlugin {
             const unsigned int heading;
             bool activeDeparture;
             bool activeArrival;
+
+            bool operator== (const Runway & compare) const {
+                return this->identifier == compare.identifier;
+            }
         } Runway;
 
     }  // namespace Airfield
