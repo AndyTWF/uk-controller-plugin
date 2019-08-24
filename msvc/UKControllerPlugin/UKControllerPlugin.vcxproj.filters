@@ -876,6 +876,9 @@
     <ClInclude Include="..\..\src\radarscreen\PositionResetCommand.h">
       <Filter>src\radarscreen</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\airfield\Runway.h">
+      <Filter>src\airfield</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\resource\UKControllerPlugin.rc">

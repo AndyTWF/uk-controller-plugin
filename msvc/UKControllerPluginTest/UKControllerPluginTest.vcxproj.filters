@@ -683,6 +683,9 @@
     <ClCompile Include="..\..\test\test\radarscreen\PositionResetCommandTest.cpp">
       <Filter>test\radarscreen</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\test\test\airfield\RunwayTest.cpp">
+      <Filter>test\airfield</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\test\helper\ApiRequestHelperFunctions.h">

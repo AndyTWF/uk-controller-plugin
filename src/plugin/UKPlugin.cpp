@@ -450,6 +450,20 @@ namespace UKControllerPlugin {
         this->radarTargetEventHandler.RadarTargetEvent(radarTargetWrapper);
     }
 
+    void UKPlugin::OnAirportRunwayActivityChanged(void)
+    {
+        EuroScopePlugIn::CSectorElement el = this->SectorFileElementSelectFirst(EuroScopePlugIn::SECTOR_ELEMENT_RUNWAY);
+        while (true) {
+            std::string name = el.GetName();
+            std::string airportName = el.GetAirportName();
+            std::string runwayName1 = el.GetRunwayName(0);
+            std::string runwayName2 = el.GetRunwayName(1);
+            bool activeDep = el.IsElementActive(true);
+            bool activeArr = el.IsElementActive(false);
+            el = this->SectorFileElementSelectNext(el, EuroScopePlugIn::SECTOR_ELEMENT_RUNWAY);
+        }
+    }
+
     /*
         Open a popup list
     */
