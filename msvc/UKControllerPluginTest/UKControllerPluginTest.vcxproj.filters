@@ -115,6 +115,9 @@
     <Filter Include="test\sectorfile">
       <UniqueIdentifier>{2b17f35f-90d1-4f2d-9826-0618a260c1f5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="test\acars">
+      <UniqueIdentifier>{e5573fb0-c412-46f3-81db-e010e8c6e6e0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\test\helper\ApiRequestHelperFunctions.cpp">
@@ -737,6 +740,11 @@
     <ClCompile Include="..\..\test\test\euroscope\RunwayDialogAwareCollectionTest.cpp">
       <Filter>test\euroscope</Filter>
     </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\..\lib\native\src\gtest\gtest-all.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\..\lib\native\src\gmock\gmock-all.cc" />
+    <ClCompile Include="..\..\test\test\acars\AcarsMessageHandlerCollectionTest.cpp">
+      <Filter>test\acars</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\test\helper\ApiRequestHelperFunctions.h">
@@ -846,6 +854,9 @@
       <Filter>mock</Filter>
     </ClInclude>
     <ClInclude Include="..\..\test\mock\MockEuroscopeSectorFileElementInterface.h">
+      <Filter>mock</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\test\mock\MockAcarsMessageHandler.h">
       <Filter>mock</Filter>
     </ClInclude>
   </ItemGroup>

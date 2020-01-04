@@ -127,6 +127,9 @@
     <Filter Include="src\sectorfile">
       <UniqueIdentifier>{61c300dc-1834-4381-b018-2c7380756930}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\acars">
+      <UniqueIdentifier>{3527b641-0dce-4824-aa86-d522c4a23e8e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\airfield\Airfield.h">
@@ -960,6 +963,21 @@
     <ClInclude Include="..\..\src\euroscope\RunwayDialogAwareCollection.h">
       <Filter>src\euroscope</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\acars\IncomingAcarsMessage.h">
+      <Filter>src\acars</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\acars\OutgoingAcarsMessage.h">
+      <Filter>src\acars</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\acars\AcarsClearance.h">
+      <Filter>src\acars</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\acars\AcarsMessageHandler.h">
+      <Filter>src\acars</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\acars\AcarsMessageHandlerCollection.h">
+      <Filter>src\acars</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\resource\UKControllerPlugin.rc">
@@ -1635,6 +1653,18 @@
     </ClCompile>
     <ClCompile Include="..\..\src\euroscope\RunwayDialogAwareCollection.cpp">
       <Filter>src\euroscope</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\IncomingAcarsMessage.cpp">
+      <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\OutgoingAcarsMessage.cpp">
+      <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\AcarsClearance.cpp">
+      <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\AcarsMessageHandlerCollection.cpp">
+      <Filter>src\acars</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

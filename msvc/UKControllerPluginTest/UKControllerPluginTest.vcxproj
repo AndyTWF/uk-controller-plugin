@@ -25,6 +25,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\..\test\test\acars\AcarsMessageHandlerCollectionTest.cpp" />
     <ClCompile Include="..\..\test\test\airfield\AirfieldCollectionFactoryTest.cpp" />
     <ClCompile Include="..\..\test\test\airfield\AirfieldCollectionTest.cpp" />
     <ClCompile Include="..\..\test\test\airfield\AirfieldTest.cpp" />
@@ -230,6 +231,7 @@
     <ClInclude Include="..\..\test\helper\TestEnvironment.h" />
     <ClInclude Include="..\..\test\helper\TestingFunctions.h" />
     <ClInclude Include="..\..\test\mock\MockAbstractTimedEvent.h" />
+    <ClInclude Include="..\..\test\mock\MockAcarsMessageHandler.h" />
     <ClInclude Include="..\..\test\mock\MockAirfieldGroup.h" />
     <ClInclude Include="..\..\test\mock\MockApiInterface.h" />
     <ClInclude Include="..\..\test\mock\MockAsrEventHandlerInterface.h" />
