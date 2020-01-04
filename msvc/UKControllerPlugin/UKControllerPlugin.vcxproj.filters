@@ -978,6 +978,12 @@
     <ClInclude Include="..\..\src\acars\AcarsMessageHandlerCollection.h">
       <Filter>src\acars</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\acars\AcarsMessageService.h">
+      <Filter>src\acars</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\curl\CurlEscaper.h">
+      <Filter>src\curl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\resource\UKControllerPlugin.rc">
@@ -1665,6 +1671,18 @@
     </ClCompile>
     <ClCompile Include="..\..\src\acars\AcarsMessageHandlerCollection.cpp">
       <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\AcarsMessageService.cpp">
+      <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\AcarsCredentials.h">
+      <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\acars\AcarsCredentials.cpp">
+      <Filter>src\acars</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\curl\CurlEscaper.cpp">
+      <Filter>src\curl</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

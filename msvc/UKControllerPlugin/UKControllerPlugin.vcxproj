@@ -18,6 +18,7 @@
     <ClInclude Include="..\..\src\acars\AcarsClearance.h" />
     <ClInclude Include="..\..\src\acars\AcarsMessageHandler.h" />
     <ClInclude Include="..\..\src\acars\AcarsMessageHandlerCollection.h" />
+    <ClInclude Include="..\..\src\acars\AcarsMessageService.h" />
     <ClInclude Include="..\..\src\acars\IncomingAcarsMessage.h" />
     <ClInclude Include="..\..\src\acars\OutgoingAcarsMessage.h" />
     <ClInclude Include="..\..\src\airfield\Airfield.h" />
@@ -74,6 +75,7 @@
     <ClInclude Include="..\..\src\countdown\TimerConfigurationDialog.h" />
     <ClInclude Include="..\..\src\countdown\TimerConfigurationManager.h" />
     <ClInclude Include="..\..\src\curl\CurlApi.h" />
+    <ClInclude Include="..\..\src\curl\CurlEscaper.h" />
     <ClInclude Include="..\..\src\curl\CurlInterface.h" />
     <ClInclude Include="..\..\src\curl\CurlRequest.h" />
     <ClInclude Include="..\..\src\curl\CurlResponse.h" />
@@ -300,7 +302,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\acars\AcarsClearance.cpp" />
+    <ClCompile Include="..\..\src\acars\AcarsCredentials.cpp" />
+    <ClCompile Include="..\..\src\acars\AcarsCredentials.h" />
     <ClCompile Include="..\..\src\acars\AcarsMessageHandlerCollection.cpp" />
+    <ClCompile Include="..\..\src\acars\AcarsMessageService.cpp" />
     <ClCompile Include="..\..\src\acars\IncomingAcarsMessage.cpp" />
     <ClCompile Include="..\..\src\acars\OutgoingAcarsMessage.cpp" />
     <ClCompile Include="..\..\src\airfield\Airfield.cpp" />
@@ -349,6 +354,7 @@
     <ClCompile Include="..\..\src\countdown\TimerConfigurationDialog.cpp" />
     <ClCompile Include="..\..\src\countdown\TimerConfigurationManager.cpp" />
     <ClCompile Include="..\..\src\curl\CurlApi.cpp" />
+    <ClCompile Include="..\..\src\curl\CurlEscaper.cpp" />
     <ClCompile Include="..\..\src\curl\CurlRequest.cpp" />
     <ClCompile Include="..\..\src\curl\CurlResponse.cpp" />
     <ClCompile Include="..\..\src\datablock\DatablockBoostrap.cpp" />

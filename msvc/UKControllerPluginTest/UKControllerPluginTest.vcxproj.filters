@@ -745,6 +745,9 @@
     <ClCompile Include="..\..\test\test\acars\AcarsMessageHandlerCollectionTest.cpp">
       <Filter>test\acars</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\test\test\curl\CurlEscaperTest.cpp">
+      <Filter>test\curl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\test\helper\ApiRequestHelperFunctions.h">

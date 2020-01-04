@@ -67,6 +67,7 @@
     <ClCompile Include="..\..\test\test\countdown\GlobalCountdownSettingsFunctionsTest.cpp" />
     <ClCompile Include="..\..\test\test\countdown\TimerConfigurationManagerTest.cpp" />
     <ClCompile Include="..\..\test\test\countdown\TimerConfigurationTest.cpp" />
+    <ClCompile Include="..\..\test\test\curl\CurlEscaperTest.cpp" />
     <ClCompile Include="..\..\test\test\curl\CurlRequestTest.cpp" />
     <ClCompile Include="..\..\test\test\curl\CurlResponseTest.cpp" />
     <ClCompile Include="..\..\test\test\datablock\DatablockBootstrapTest.cpp" />
