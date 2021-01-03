@@ -282,6 +282,39 @@ namespace UKControllerPlugin {
             return this->AddCommonHeaders(request);
         }
 
+        CurlRequest ApiRequestBuilder::BuildGetActiveDepartureRestrictionsRequest() const
+        {
+            return this->AddCommonHeaders(
+                CurlRequest(this->apiDomain + "/departure/restrictions", CurlRequest::METHOD_GET)
+            );
+        }
+
+        CurlRequest ApiRequestBuilder::BuildCreateDepartureRestrictionRequest(
+            std::string type,
+            int intervalSeconds,
+            std::chrono::system_clock::time_point expiryTime,
+            std::string airfield, 
+            std::set<std::string> sidIdentifiers
+        ) const {
+            std::ostringstream timestampStream;
+            date::operator<<(timestampStream, date::floor<std::chrono::seconds>(expiryTime));
+
+            CurlRequest request(this->apiDomain + "/departure/restrictions", CurlRequest::METHOD_POST);
+            nlohmann::json body = nlohmann::json::object(
+                {
+                    {"type", type},
+                    {"interval", intervalSeconds},
+                    {"expires_at", timestampStream.str()},
+                    {"airfield", airfield},
+                    {"sids", sidIdentifiers}
+                }
+            );
+
+            request.SetBody(body.dump());
+
+            return this->AddCommonHeaders(request);
+        }
+
         CurlRequest ApiRequestBuilder::BuildEnrouteReleaseRequest(
             std::string aircraftCallsign,
             std::string sendingController,
@@ -298,6 +331,38 @@ namespace UKControllerPlugin {
             request.SetBody(data.dump());
 
             return this->AddCommonHeaders(request);
+        }
+
+        CurlRequest ApiRequestBuilder::BuildUpdateDepartureRestrictionRequest(
+            int restrictionId,
+            int intervalSeconds,
+            std::chrono::system_clock::time_point expiryTime,
+            std::string airfield,
+            std::set<std::string> sidIdentifiers
+        ) const {
+            std::ostringstream timestampStream;
+            date::operator<<(timestampStream, date::floor<std::chrono::seconds>(expiryTime));
+
+            CurlRequest request(this->apiDomain + "/departure/restriction/" + std::to_string(restrictionId), CurlRequest::METHOD_PUT);
+            nlohmann::json body = nlohmann::json::object(
+                {
+                    {"interval", intervalSeconds},
+                    {"expires_at", timestampStream.str()},
+                    {"airfield", airfield},
+                    {"sids", sidIdentifiers}
+                }
+            );
+
+            request.SetBody(body.dump());
+
+            return this->AddCommonHeaders(request);
+        }
+
+        CurlRequest ApiRequestBuilder::BuildExpireDepartureRestrictionRequest(int restrictionId) const
+        {
+            return this->AddCommonHeaders(
+                CurlRequest(this->apiDomain + "/departure/restriction/" + std::to_string(restrictionId), CurlRequest::METHOD_DELETE)
+            );
         }
 
         /*

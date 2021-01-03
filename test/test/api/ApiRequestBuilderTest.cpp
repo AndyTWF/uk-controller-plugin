@@ -365,5 +365,108 @@ namespace UKControllerPluginTest {
 
             EXPECT_TRUE(expectedRequest == this->builder.BuildDeleteStandAssignmentForAircraftRequest("BAW123"));
         }
+
+        TEST_F(ApiRequestBuilderTest, ItBuildsGetActiveDepartureRestrictionsRequest)
+        {
+            CurlRequest expectedRequest(
+                "http://testurl.com/departure/restrictions",
+                CurlRequest::METHOD_GET
+            );
+
+            expectedRequest.AddHeader("Authorization", "Bearer apikey");
+            expectedRequest.AddHeader("Accept", "application/json");
+            expectedRequest.AddHeader("Content-Type", "application/json");
+
+            EXPECT_TRUE(expectedRequest == this->builder.BuildGetActiveDepartureRestrictionsRequest());
+        }
+
+        TEST_F(ApiRequestBuilderTest, ItBuildsExpireDepartureRestrictionRequest)
+        {
+            CurlRequest expectedRequest(
+                "http://testurl.com/departure/restriction/1",
+                CurlRequest::METHOD_DELETE
+            );
+
+            expectedRequest.AddHeader("Authorization", "Bearer apikey");
+            expectedRequest.AddHeader("Accept", "application/json");
+            expectedRequest.AddHeader("Content-Type", "application/json");
+
+            EXPECT_TRUE(expectedRequest == this->builder.BuildExpireDepartureRestrictionRequest(1));
+        }
+
+        TEST_F(ApiRequestBuilderTest, ItBuildsCreateDepartureRestrictionRequest)
+        {
+            std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+            std::ostringstream expectedTimeString;
+            date::operator<<(expectedTimeString, date::floor<std::chrono::seconds>(now));
+
+            CurlRequest expectedRequest(
+                "http://testurl.com/departure/restrictions",
+                CurlRequest::METHOD_POST
+            );
+
+            expectedRequest.AddHeader("Authorization", "Bearer apikey");
+            expectedRequest.AddHeader("Accept", "application/json");
+            expectedRequest.AddHeader("Content-Type", "application/json");
+
+            nlohmann::json expectedBody = nlohmann::json::object(
+                {
+                    {"type", "mdi"},
+                    {"interval", 5},
+                    {"expires_at", expectedTimeString.str()},
+                    {"airfield", "EGLL"},
+                    {"sids", nlohmann::json::array({"TEST1A", "TEST2B", "TEST3C"})}
+                }
+            );
+
+            expectedRequest.SetBody(expectedBody.dump());
+
+            EXPECT_TRUE(
+                expectedRequest == this->builder.BuildCreateDepartureRestrictionRequest(
+                    "mdi",
+                    5,
+                    now,
+                    "EGLL",
+                    std::set<std::string> {"TEST1A", "TEST2B", "TEST3C"}
+                )
+            );
+        }
+
+        TEST_F(ApiRequestBuilderTest, ItBuildsUpdateDepartureRestrictionRequest)
+        {
+            std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+            std::ostringstream expectedTimeString;
+            date::operator<<(expectedTimeString, date::floor<std::chrono::seconds>(now));
+
+            CurlRequest expectedRequest(
+                "http://testurl.com/departure/restriction/1",
+                CurlRequest::METHOD_PUT
+            );
+
+            expectedRequest.AddHeader("Authorization", "Bearer apikey");
+            expectedRequest.AddHeader("Accept", "application/json");
+            expectedRequest.AddHeader("Content-Type", "application/json");
+
+            nlohmann::json expectedBody = nlohmann::json::object(
+                {
+                    {"interval", 5},
+                    {"expires_at", expectedTimeString.str()},
+                    {"airfield", "EGLL"},
+                    {"sids", nlohmann::json::array({"TEST1A", "TEST2B", "TEST3C"})}
+                }
+            );
+
+            expectedRequest.SetBody(expectedBody.dump());
+
+            EXPECT_TRUE(
+                expectedRequest == this->builder.BuildUpdateDepartureRestrictionRequest(
+                    1,
+                    5,
+                    now,
+                    "EGLL",
+                    std::set<std::string> {"TEST1A", "TEST2B", "TEST3C"}
+                )
+            );
+        }
     }  // namespace Api
 }  // namespace UKControllerPluginTest

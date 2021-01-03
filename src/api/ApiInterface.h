@@ -55,6 +55,22 @@ namespace UKControllerPlugin {
                     int releaseType,
                     std::string releasePoint
                 ) const = 0;
+                virtual nlohmann::json GetActiveDepartureRestrictions(void) const = 0;
+                virtual void ExpireDepartureRestriction(int id) const = 0;
+                virtual void CreateDepartureRestriction(
+                    std::string type,
+                    int intervalSeconds,
+                    std::chrono::system_clock::time_point expireTime,
+                    std::string airfield,
+                    std::set<std::string> sids
+                ) const = 0;
+                virtual void UpdateDepartureRestriction(
+                    int id,
+                    int intervalSeconds,
+                    std::chrono::system_clock::time_point expireTime,
+                    std::string airfield,
+                    std::set<std::string> sids
+                ) const = 0;
                 virtual int UpdateCheck(std::string version) const = 0;
                 virtual void SetApiKey(std::string key) = 0;
                 virtual void SetApiDomain(std::string domain) = 0;

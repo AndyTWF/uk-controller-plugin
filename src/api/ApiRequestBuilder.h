@@ -70,6 +70,24 @@ namespace UKControllerPlugin {
                     int releaseType,
                     std::string releasePoint
                 ) const;
+                UKControllerPlugin::Curl::CurlRequest BuildGetActiveDepartureRestrictionsRequest(void) const;
+                UKControllerPlugin::Curl::CurlRequest BuildCreateDepartureRestrictionRequest(
+                    std::string type,
+                    int intervalSeconds,
+                    std::chrono::system_clock::time_point expiryTime,
+                    std::string airfield,
+                    std::set<std::string> sidIdentifiers
+                ) const;
+                UKControllerPlugin::Curl::CurlRequest BuildUpdateDepartureRestrictionRequest(
+                    int restrictionId,
+                    int intervalSeconds,
+                    std::chrono::system_clock::time_point expiryTime,
+                    std::string airfield,
+                    std::set<std::string> sidIdentifiers
+                ) const;
+                UKControllerPlugin::Curl::CurlRequest BuildExpireDepartureRestrictionRequest(
+                    int restrictionId
+                ) const;
                 std::string GetApiDomain(void) const;
                 std::string GetApiKey(void) const;
                 void SetApiDomain(std::string domain);

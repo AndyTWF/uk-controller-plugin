@@ -313,6 +313,54 @@ namespace UKControllerPlugin {
             );
         }
 
+        nlohmann::json ApiHelper::GetActiveDepartureRestrictions() const
+        {
+            return this->MakeApiRequest(
+                this->requestBuilder.BuildGetActiveDepartureRestrictionsRequest()
+            ).GetRawData();
+        }
+
+        void ApiHelper::ExpireDepartureRestriction(int id) const
+        {
+            this->MakeApiRequest(this->requestBuilder.BuildExpireDepartureRestrictionRequest(id));
+        }
+
+        void ApiHelper::CreateDepartureRestriction(
+            std::string type,
+            int intervalSeconds,
+            std::chrono::system_clock::time_point expireTime,
+            std::string airfield,
+            std::set<std::string> sids
+        ) const {
+            this->MakeApiRequest(
+                this->requestBuilder.BuildCreateDepartureRestrictionRequest(
+                    type,
+                    intervalSeconds,
+                    expireTime,
+                    airfield,
+                    sids
+                )
+            );
+        }
+
+        void ApiHelper::UpdateDepartureRestriction(
+            int id,
+            int intervalSeconds,
+            std::chrono::system_clock::time_point expireTime,
+            std::string airfield,
+            std::set<std::string> sids
+        ) const {
+            this->MakeApiRequest(
+                this->requestBuilder.BuildUpdateDepartureRestrictionRequest(
+                    id,
+                    intervalSeconds,
+                    expireTime,
+                    airfield,
+                    sids
+                )
+            );
+        }
+
         /*
             Runs an update check.
         */

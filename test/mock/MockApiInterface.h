@@ -52,6 +52,28 @@ namespace UKControllerPluginTest {
                     SendEnrouteReleaseWithReleasePoint,
                     void(std::string, std::string, std::string, int, std::string)
                 );
+                MOCK_CONST_METHOD0(GetActiveDepartureRestrictions, nlohmann::json(void));
+                MOCK_CONST_METHOD1(ExpireDepartureRestriction, void(int));
+                MOCK_CONST_METHOD5(
+                    CreateDepartureRestriction,
+                    void(
+                        std::string,
+                        int,
+                        std::chrono::system_clock::time_point,
+                        std::string,
+                        std::set<std::string>
+                    )
+                );
+                MOCK_CONST_METHOD5(
+                    UpdateDepartureRestriction,
+                    void(
+                        int,
+                        int,
+                        std::chrono::system_clock::time_point,
+                        std::string,
+                        std::set<std::string>
+                    )
+                );
                 MOCK_CONST_METHOD1(UpdateCheck, int(std::string));
                 MOCK_METHOD1(SetApiDomain, void(std::string));
                 MOCK_METHOD1(SetApiKey, void(std::string));

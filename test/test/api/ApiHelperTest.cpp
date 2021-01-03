@@ -825,5 +825,134 @@ TEST_F(ApiHelperTest, DeleteStandAssignmentForAircraftGeneratesRequest)
 
     EXPECT_NO_THROW(this->helper.DeleteStandAssignmentForAircraft("BAW123"));
 }
+
+TEST_F(ApiHelperTest, GetActiveDepartureRestrictionsReturnsRestrictionJson)
+{
+    nlohmann::json responseData;
+    responseData["bla"] = "bla";
+    CurlResponse response(responseData.dump(), false, 200);
+
+    CurlRequest expectedRequest(
+        GetApiCurlRequest(
+            "/departure/restrictions",
+            CurlRequest::METHOD_GET
+        )
+    );
+
+    EXPECT_CALL(this->mockCurlApi, MakeCurlRequest(expectedRequest))
+        .Times(1)
+        .WillOnce(Return(response));
+
+    EXPECT_NO_THROW(this->helper.GetActiveDepartureRestrictions());
+}
+
+TEST_F(ApiHelperTest, ExpireDepartureRestrictionMakesRequest)
+{
+    nlohmann::json responseData;
+    responseData["bla"] = "bla";
+    CurlResponse response(responseData.dump(), false, 200);
+
+    CurlRequest expectedRequest(
+        GetApiCurlRequest(
+            "/departure/restriction/1",
+            CurlRequest::METHOD_DELETE
+        )
+    );
+
+    EXPECT_CALL(this->mockCurlApi, MakeCurlRequest(expectedRequest))
+        .Times(1)
+        .WillOnce(Return(response));
+
+    EXPECT_NO_THROW(this->helper.ExpireDepartureRestriction(1));
+}
+
+TEST_F(ApiHelperTest, CreateDepartureRestrictionMakesRequest)
+{
+    nlohmann::json responseData;
+    responseData["bla"] = "bla";
+    CurlResponse response(responseData.dump(), false, 200);
+
+    CurlRequest expectedRequest(
+        GetApiCurlRequest(
+            "/departure/restrictions",
+            CurlRequest::METHOD_POST
+        )
+    );
+
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    std::ostringstream expectedTimeString;
+    date::operator<<(expectedTimeString, date::floor<std::chrono::seconds>(now));
+
+    nlohmann::json expectedBody = nlohmann::json::object(
+        {
+            {"type", "mdi"},
+            {"interval", 5},
+            {"expires_at", expectedTimeString.str()},
+            {"airfield", "EGLL"},
+            {"sids", nlohmann::json::array({"TEST1A", "TEST2B", "TEST3C"})}
+        }
+    );
+
+    expectedRequest.SetBody(expectedBody.dump());
+
+
+    EXPECT_CALL(this->mockCurlApi, MakeCurlRequest(expectedRequest))
+        .Times(1)
+        .WillOnce(Return(response));
+
+    EXPECT_NO_THROW(
+        this->helper.CreateDepartureRestriction(
+            "mdi",
+            5,
+            now,
+            "EGLL", 
+            std::set<std::string>{"TEST1A", "TEST2B", "TEST3C"}
+        )
+    );
+}
+
+TEST_F(ApiHelperTest, UpdateDepartureRestrictionMakesRequest)
+{
+    nlohmann::json responseData;
+    responseData["bla"] = "bla";
+    CurlResponse response(responseData.dump(), false, 200);
+
+    CurlRequest expectedRequest(
+        GetApiCurlRequest(
+            "/departure/restriction/1",
+            CurlRequest::METHOD_PUT
+        )
+    );
+
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    std::ostringstream expectedTimeString;
+    date::operator<<(expectedTimeString, date::floor<std::chrono::seconds>(now));
+
+    nlohmann::json expectedBody = nlohmann::json::object(
+        {
+            {"interval", 5},
+            {"expires_at", expectedTimeString.str()},
+            {"airfield", "EGLL"},
+            {"sids", nlohmann::json::array({"TEST1A", "TEST2B", "TEST3C"})}
+        }
+    );
+
+    expectedRequest.SetBody(expectedBody.dump());
+
+
+    EXPECT_CALL(this->mockCurlApi, MakeCurlRequest(expectedRequest))
+        .Times(1)
+        .WillOnce(Return(response));
+
+    EXPECT_NO_THROW(
+        this->helper.UpdateDepartureRestriction(
+            1,
+            5,
+            now,
+            "EGLL", 
+            std::set<std::string>{"TEST1A", "TEST2B", "TEST3C"}
+        )
+    );
+}
 }  // namespace Api
 }  // namespace UKControllerPluginTest

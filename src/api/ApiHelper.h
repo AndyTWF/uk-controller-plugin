@@ -70,6 +70,22 @@ namespace UKControllerPlugin {
                     int releaseType,
                     std::string releasePoint
                 ) const override;
+                nlohmann::json GetActiveDepartureRestrictions(void) const override;
+                void ExpireDepartureRestriction(int id) const override;
+                void CreateDepartureRestriction(
+                    std::string type,
+                    int intervalSeconds,
+                    std::chrono::system_clock::time_point expireTime,
+                    std::string airfield,
+                    std::set<std::string> sids
+                ) const override;
+                void UpdateDepartureRestriction(
+                    int id,
+                    int intervalSeconds,
+                    std::chrono::system_clock::time_point expireTime,
+                    std::string airfield,
+                    std::set<std::string> sids
+                ) const override;
                 int UpdateCheck(std::string version) const override;
                 void SetApiKey(std::string key) override;
                 void SetApiDomain(std::string domain) override;
