@@ -1,5 +1,5 @@
 {
-  "branches": [ "main" ],
+  "branch": "tmp/thing",
   "tagFormat": "${version}",
   "plugins": [
     "@semantic-release/commit-analyzer",
