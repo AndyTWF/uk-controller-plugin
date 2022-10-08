@@ -14,6 +14,10 @@ namespace UKControllerPlugin {
             static const std::string prenoteChatAreaMessagesSettingsKey;
             static const std::string prenoteChatAreaMessagesSettingsDescription;
 
+            // RELEASES
+            static const std::string releaseChatAreaMessagesSettingsKey;
+            static const std::string releaseChatAreaMessagesSettingsDescription;
+
             // SQUAWKS
             static const std::string squawkToggleSettingsKey;
             static const std::string squawkToggleSettingsDescription;
