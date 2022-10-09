@@ -1,4 +1,3 @@
-#include "PrenoteEventHandler.h"
 #include "PrenoteService.h"
 #include "PublishedPrenote.h"
 #include "PublishedPrenoteMapper.h"
@@ -17,7 +16,6 @@ using UKControllerPlugin::Controller::ActiveCallsignCollection;
 using UKControllerPlugin::Controller::ControllerPosition;
 using UKControllerPlugin::Controller::ControllerPositionHierarchy;
 using UKControllerPlugin::Euroscope::EuroScopeCFlightPlanInterface;
-using UKControllerPlugin::Euroscope::EuroScopeCRadarTargetInterface;
 using UKControllerPlugin::Message::UserMessager;
 using UKControllerPlugin::Ownership::AirfieldServiceProviderCollection;
 using UKControllerPlugin::Prenote::PrenoteUserMessage;
