@@ -130,6 +130,13 @@ set(src__controller
         controller/ActiveCallsignEventHandlerInterface.cpp)
 source_group("src\\controller" FILES ${src__controller})
 
+set(src__coordination
+        "command/CommandHandlerCollection.cpp"
+        "command/CommandHandlerCollection.h"
+        "command/CommandHandlerInterface.h"
+        command/CommandHandlerInterface.cpp coordination/CoordinationChatAreaMessage.h coordination/SendCoordinationChatAreaMessage.cpp coordination/SendCoordinationChatAreaMessage.h)
+source_group("src\\coordination" FILES ${src__coordination})
+
 set(src__countdown
     "countdown/CountdownModule.cpp"
     "countdown/CountdownModule.h"
@@ -951,6 +958,7 @@ set(ALL_FILES
     ${src__command}
     ${src__components}
     ${src__controller}
+    ${src__coordination}
     ${src__countdown}
     ${src__datablock}
     ${src__departure}

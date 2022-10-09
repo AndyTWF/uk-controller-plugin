@@ -15,7 +15,8 @@ namespace UKControllerPluginTest::Prenote {
         SendPrenoteAcknowledgedChatAreaMessageTest()
             : userSettings(userSettingProvider),
               mockPrenoteRelevance(std::make_shared<testing::NiceMock<MockPrenoteUserRelevanceChecker>>()),
-              sendMessage(mockPrenoteRelevance, plugin, userSettings)
+              mockCoordination(std::make_shared<testing::NiceMock<Coordination::MockCoordinationChatAreaMessage>>()),
+              sendMessage(mockPrenoteRelevance, userSettings, mockCoordination)
         {
             sendingPosition = std::make_shared<ControllerPosition>(
                 1, "EGKK_TWR", 124.225, std::vector<std::string>{"EGKK"}, true, false);
@@ -28,7 +29,7 @@ namespace UKControllerPluginTest::Prenote {
         std::shared_ptr<ControllerPosition> sendingPosition;
         std::shared_ptr<ControllerPosition> receivingPosition;
         std::shared_ptr<testing::NiceMock<MockPrenoteUserRelevanceChecker>> mockPrenoteRelevance;
-        testing::NiceMock<Euroscope::MockEuroscopePluginLoopbackInterface> plugin;
+        std::shared_ptr<testing::NiceMock<Coordination::MockCoordinationChatAreaMessage>> mockCoordination;
         SendPrenoteAcknowledgedChatAreaMessage sendMessage;
     };
 
@@ -46,16 +47,9 @@ namespace UKControllerPluginTest::Prenote {
             receivingPosition,
             std::chrono::system_clock::now());
         EXPECT_CALL(
-            plugin,
-            ChatAreaMessage(
-                "UKCP_COORDINATION",
-                "UKCP",
-                "Prenote message for BAW123 has been acknowledged by EGKK_F_APP.",
-                true,
-                true,
-                true,
-                true,
-                true))
+            *mockCoordination,
+            SendMessage(
+                "Prenote message for BAW123 has been acknowledged by EGKK_F_APP."))
             .Times(1);
         EXPECT_CALL(*mockPrenoteRelevance, IsRelevant(testing::Ref(message))).Times(1).WillOnce(testing::Return(true));
         sendMessage.MessageAcknowledged(message);
@@ -75,7 +69,7 @@ namespace UKControllerPluginTest::Prenote {
             sendingPosition,
             receivingPosition,
             std::chrono::system_clock::now());
-        EXPECT_CALL(plugin, ChatAreaMessage).Times(0);
+        EXPECT_CALL(*mockCoordination, SendMessage).Times(0);
         EXPECT_CALL(*mockPrenoteRelevance, IsRelevant(testing::Ref(message))).Times(0);
         sendMessage.MessageAcknowledged(message);
     }
@@ -93,7 +87,7 @@ namespace UKControllerPluginTest::Prenote {
             sendingPosition,
             receivingPosition,
             std::chrono::system_clock::now());
-        EXPECT_CALL(plugin, ChatAreaMessage).Times(0);
+        EXPECT_CALL(*mockCoordination, SendMessage).Times(0);
         EXPECT_CALL(*mockPrenoteRelevance, IsRelevant(testing::Ref(message))).Times(1).WillOnce(testing::Return(false));
         sendMessage.MessageAcknowledged(message);
     }

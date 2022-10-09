@@ -81,6 +81,9 @@ set(test__controller
 )
 source_group("test\\controller" FILES ${test__controller})
 
+set(test__coordination coordination/SendCoordinationChatAreaMessageTest.cpp)
+source_group("test\\coordination" FILES ${test__coordination})
+
 set(test__countdown
     "countdown/CountdownModuleTest.cpp"
     "countdown/CountdownRendererTest.cpp"
@@ -363,7 +366,7 @@ set(test__mock
     mock/MockBootstrapProvider.h
     mock/MockPluginSettingsProvider.h
     mock/MockPrenoteMessageEventHandlerInterface.h
-    mock/MockPrenoteUserRelevanceChecker.h)
+    mock/MockPrenoteUserRelevanceChecker.h mock/MockCoordinationChatAreaMessage.h)
 source_group("test\\mock" FILES ${test__mock})
 
 set(test__navaids
@@ -601,6 +604,7 @@ set(ALL_FILES
     ${test__command}
     ${test__components}
     ${test__controller}
+    ${test__coordination}
     ${test__countdown}
     ${test__datablock}
     ${test__departure}

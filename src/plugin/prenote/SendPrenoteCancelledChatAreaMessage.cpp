@@ -2,7 +2,7 @@
 #include "PrenoteUserRelevanceChecker.h"
 #include "SendPrenoteCancelledChatAreaMessage.h"
 #include "controller/ControllerPosition.h"
-#include "euroscope/EuroscopePluginLoopbackInterface.h"
+#include "coordination/CoordinationChatAreaMessage.h"
 #include "euroscope/GeneralSettingsEntries.h"
 #include "euroscope/UserSetting.h"
 
@@ -10,11 +10,12 @@ namespace UKControllerPlugin::Prenote {
 
     SendPrenoteCancelledChatAreaMessage::SendPrenoteCancelledChatAreaMessage(
         std::shared_ptr<PrenoteUserRelevanceChecker> prenoteRelevance,
-        Euroscope::EuroscopePluginLoopbackInterface& plugin,
-        Euroscope::UserSetting& userSettings)
-        : prenoteRelevance(prenoteRelevance), plugin(plugin), userSettings(userSettings)
+        Euroscope::UserSetting& userSettings,
+        std::shared_ptr<Coordination::CoordinationChatAreaMessage> coordinationChatArea)
+        : prenoteRelevance(prenoteRelevance), userSettings(userSettings), coordinationChatArea(coordinationChatArea)
     {
         assert(prenoteRelevance && "Prenote relevance is nullptr");
+        assert(coordinationChatArea && "Coordination chat area is nullptr");
     }
 
     void SendPrenoteCancelledChatAreaMessage::MessageCancelled(const PrenoteMessage& message)
@@ -23,16 +24,9 @@ namespace UKControllerPlugin::Prenote {
             return;
         }
 
-        plugin.ChatAreaMessage(
-            "UKCP_COORDINATION",
-            "UKCP",
+        coordinationChatArea->SendMessage(
             "Prenote message for " + message.GetCallsign() + " from " + message.GetSendingController()->GetCallsign() +
-                " has been cancelled.",
-            true,
-            true,
-            true,
-            true,
-            true);
+            " has been cancelled.");
     }
 
     auto SendPrenoteCancelledChatAreaMessage::UserWantsChatAreaMessages() const -> bool

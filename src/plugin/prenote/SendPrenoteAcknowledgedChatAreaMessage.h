@@ -1,10 +1,14 @@
 #pragma once
 #include "PrenoteMessageEventHandlerInterface.h"
 
-namespace UKControllerPlugin::Euroscope {
-    class EuroscopePluginLoopbackInterface;
-    class UserSetting;
-} // namespace UKControllerPlugin::Euroscope
+namespace UKControllerPlugin {
+    namespace Coordination {
+        class CoordinationChatAreaMessage;
+    } // namespace Coordination
+    namespace Euroscope {
+        class UserSetting;
+    } // namespace Euroscope
+} // namespace UKControllerPlugin
 
 namespace UKControllerPlugin::Prenote {
     class PrenoteUserRelevanceChecker;
@@ -14,8 +18,8 @@ namespace UKControllerPlugin::Prenote {
         public:
         SendPrenoteAcknowledgedChatAreaMessage(
             std::shared_ptr<PrenoteUserRelevanceChecker> prenoteRelevance,
-            Euroscope::EuroscopePluginLoopbackInterface& plugin,
-            Euroscope::UserSetting& userSettings);
+            Euroscope::UserSetting& userSettings,
+            std::shared_ptr<Coordination::CoordinationChatAreaMessage> coordinationChatArea);
         void MessageAcknowledged(const PrenoteMessage& message) override;
 
         private:
@@ -23,10 +27,10 @@ namespace UKControllerPlugin::Prenote {
         // Checks relevance of prenotes
         const std::shared_ptr<PrenoteUserRelevanceChecker> prenoteRelevance;
 
-        // For sending messages
-        Euroscope::EuroscopePluginLoopbackInterface& plugin;
-
         // User settings
         Euroscope::UserSetting& userSettings;
+
+        // For sending messages to the chat area
+        std::shared_ptr<Coordination::CoordinationChatAreaMessage> coordinationChatArea;
     };
 } // namespace UKControllerPlugin::Prenote
