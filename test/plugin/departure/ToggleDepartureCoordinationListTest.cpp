@@ -6,12 +6,14 @@
 #include "message/UserMessager.h"
 #include "prenote/PrenoteMessageCollection.h"
 #include "releases/DepartureReleaseEventHandler.h"
+#include "releases/DepartureReleaseRequestCollection.h"
 
 using testing::Test;
 using UKControllerPlugin::Departure::DepartureCoordinationList;
 using UKControllerPlugin::Departure::ToggleDepartureCoordinationList;
 using UKControllerPlugin::Message::UserMessager;
 using UKControllerPlugin::Prenote::PrenoteMessageCollection;
+using UKControllerPlugin::Releases::DepartureReleaseRequestCollection;
 
 namespace UKControllerPluginTest::Departure {
 
@@ -19,17 +21,19 @@ namespace UKControllerPluginTest::Departure {
     {
         public:
         ToggleDepartureCoordinationListTest()
-            : messager(mockPlugin), handler(
-                                        mockApi,
-                                        taskRunner,
-                                        mockPlugin,
-                                        controllers,
-                                        activeCallsigns,
-                                        dialogManager,
-                                        windows,
-                                        messager,
-                                        103,
-                                        104),
+            : messager(mockPlugin), requests(std::make_shared<DepartureReleaseRequestCollection>()),
+              handler(
+                  requests,
+                  mockApi,
+                  taskRunner,
+                  mockPlugin,
+                  controllers,
+                  activeCallsigns,
+                  dialogManager,
+                  windows,
+                  messager,
+                  103,
+                  104),
               list(std::make_shared<DepartureCoordinationList>(
                   handler, prenotes, mockPlugin, controllers, activeCallsigns, 3)),
               dialogManager(dialogProvider)
@@ -50,6 +54,7 @@ namespace UKControllerPluginTest::Departure {
         testing::NiceMock<Windows::MockWinApi> windows;
         UserMessager messager;
         PrenoteMessageCollection prenotes;
+        std::shared_ptr<DepartureReleaseRequestCollection> requests;
         UKControllerPlugin::Releases::DepartureReleaseEventHandler handler;
         std::shared_ptr<DepartureCoordinationList> list;
         UKControllerPlugin::Controller::ActiveCallsignCollection activeCallsigns;

@@ -34,6 +34,7 @@ namespace UKControllerPlugin {
     namespace Releases {
 
         class DepartureReleaseRequest;
+        class DepartureReleaseRequestCollection;
 
         /*
             Handles events relating to departure releases.
@@ -44,6 +45,7 @@ namespace UKControllerPlugin {
         {
             public:
             DepartureReleaseEventHandler(
+                std::shared_ptr<DepartureReleaseRequestCollection> releaseRequests,
                 const Api::ApiInterface& api,
                 TaskManager::TaskRunnerInterface& taskRunner,
                 Euroscope::EuroscopePluginLoopbackInterface& plugin,
@@ -57,8 +59,6 @@ namespace UKControllerPlugin {
             void ProcessPushEvent(const Push::PushEvent& message) override;
             [[nodiscard]] auto GetPushEventSubscriptions() const -> std::set<Push::PushEventSubscription> override;
             void PluginEventsSynced() override{};
-            void AddReleaseRequest(const std::shared_ptr<DepartureReleaseRequest>& request);
-            auto GetReleaseRequest(int id) -> std::shared_ptr<DepartureReleaseRequest>;
             void TimedEventTrigger() override;
             void OpenRequestDialog(
                 Euroscope::EuroScopeCFlightPlanInterface& flightplan,
@@ -108,7 +108,7 @@ namespace UKControllerPlugin {
             [[nodiscard]] auto DepartureReleaseRejectedMessageValid(const nlohmann::json& data) const -> bool;
             [[nodiscard]] auto DepartureReleaseApprovedMessageValid(const nlohmann::json& data) const -> bool;
             [[nodiscard]] auto DepartureReleaseCancelMessageValid(const nlohmann::json& data) const -> bool;
-            static auto ReleaseShouldBeRemoved(const std::shared_ptr<DepartureReleaseRequest>& releaseRequest) -> bool;
+            static auto ReleaseShouldBeRemoved(const DepartureReleaseRequest& releaseRequest) -> bool;
             [[nodiscard]] auto
             ControllerCanMakeReleaseDecision(const std::shared_ptr<DepartureReleaseRequest>& releaseRequest) const
                 -> bool;
@@ -120,8 +120,8 @@ namespace UKControllerPlugin {
             [[nodiscard]] auto UserRequestedRelease(const std::shared_ptr<DepartureReleaseRequest>& request) const
                 -> bool;
 
-            // A guard on the map to allow async operations
-            std::mutex releaseMapGuard;
+            // Release requests in progress
+            std::shared_ptr<DepartureReleaseRequestCollection> releaseRequests;
 
             // Callback for when a release decision is made
             const int releaseDecisionCallbackId;
@@ -135,9 +135,6 @@ namespace UKControllerPlugin {
 
             static const int RELEASE_EXPIRY_SECONDS = 300;
             static const int RELEASE_DECISION_MADE_DELETE_AFTER_SECONDS = 90;
-
-            // Release requests in progress
-            std::map<int, std::shared_ptr<DepartureReleaseRequest>> releaseRequests;
 
             // Controller positions
             const Controller::ControllerPositionCollection& controllers;

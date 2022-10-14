@@ -8,11 +8,13 @@
 #include "prenote/PrenoteMessageCollection.h"
 #include "releases/DepartureReleaseEventHandler.h"
 #include "releases/DepartureReleaseRequest.h"
+#include "releases/DepartureReleaseRequestCollection.h"
 
 using testing::Test;
 using UKControllerPlugin::Departure::DepartureCoordinationList;
 using UKControllerPlugin::Message::UserMessager;
 using UKControllerPlugin::Prenote::PrenoteMessageCollection;
+using UKControllerPlugin::Releases::DepartureReleaseRequestCollection;
 
 namespace UKControllerPluginTest::Departure {
 
@@ -23,23 +25,24 @@ namespace UKControllerPluginTest::Departure {
             : userSettings(mockAsrProvider), messager(mockPlugin),
               list(std::make_shared<DepartureCoordinationList>(
                   handler, prenotes, mockPlugin, controllers, activeCallsigns, 3)),
-              handler(
-                  mockApi,
-                  taskRunner,
-                  mockPlugin,
-                  controllers,
-                  activeCallsigns,
-                  dialogManager,
-                  windows,
-                  messager,
-                  103,
-                  104),
+              releaseRequests(std::make_shared<DepartureReleaseRequestCollection>()), handler(
+                                                                                          releaseRequests,
+                                                                                          mockApi,
+                                                                                          taskRunner,
+                                                                                          mockPlugin,
+                                                                                          controllers,
+                                                                                          activeCallsigns,
+                                                                                          dialogManager,
+                                                                                          windows,
+                                                                                          messager,
+                                                                                          103,
+                                                                                          104),
               dialogManager(dialogProvider)
         {
             // Add positions and releases
             auto request = std::make_shared<UKControllerPlugin::Releases::DepartureReleaseRequest>(
                 1, "BAW123", 3, 2, std::chrono::system_clock::now() + std::chrono::minutes(5));
-            handler.AddReleaseRequest(request);
+            releaseRequests->Add(request);
             auto position = std::make_shared<UKControllerPlugin::Controller::ControllerPosition>(
                 2, "EGFF_APP", 125.850, std::vector<std::string>{"EGGD", "EGFF"}, true, true);
             controllers.AddPosition(position);
@@ -56,6 +59,7 @@ namespace UKControllerPluginTest::Departure {
         UKControllerPlugin::Euroscope::UserSetting userSettings;
         UserMessager messager;
         std::shared_ptr<DepartureCoordinationList> list;
+        std::shared_ptr<DepartureReleaseRequestCollection> releaseRequests;
         UKControllerPlugin::Releases::DepartureReleaseEventHandler handler;
         UKControllerPlugin::Controller::ActiveCallsignCollection activeCallsigns;
         testing::NiceMock<Dialog::MockDialogProvider> dialogProvider;

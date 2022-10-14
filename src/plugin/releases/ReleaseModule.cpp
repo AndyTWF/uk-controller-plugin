@@ -1,6 +1,7 @@
 #include "ApproveDepartureReleaseDialog.h"
 #include "CompareEnrouteReleaseTypes.h"
 #include "DepartureReleaseEventHandler.h"
+#include "DepartureReleaseRequestCollection.h"
 #include "DepartureReleaseRequestView.h"
 #include "EnrouteReleaseEventHandler.h"
 #include "EnrouteReleaseTypesSerializer.h"
@@ -113,7 +114,9 @@ namespace UKControllerPlugin::Releases {
         // Create the event handler
         const int releaseDecisionCallbackId = container.pluginFunctionHandlers->ReserveNextDynamicFunctionId();
         const int releaseCancellationCallbackId = container.pluginFunctionHandlers->ReserveNextDynamicFunctionId();
+        auto releaseRequests = std::make_shared<DepartureReleaseRequestCollection>();
         auto departureHandler = std::make_shared<DepartureReleaseEventHandler>(
+            releaseRequests,
             *container.api,
             *container.taskRunner,
             *container.plugin,

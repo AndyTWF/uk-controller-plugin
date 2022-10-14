@@ -2,6 +2,7 @@
 #include "DepartureReleaseCountdownColours.h"
 #include "DepartureReleaseEventHandler.h"
 #include "DepartureReleaseRequest.h"
+#include "DepartureReleaseRequestCollection.h"
 #include "DepartureReleaseRequestView.h"
 #include "ReleaseApprovalRemarksUserMessage.h"
 #include "ReleaseRejectionRemarksUserMessage.h"
@@ -25,6 +26,7 @@
 namespace UKControllerPlugin::Releases {
 
     DepartureReleaseEventHandler::DepartureReleaseEventHandler(
+        std::shared_ptr<DepartureReleaseRequestCollection> releaseRequests,
         const Api::ApiInterface& api,
         TaskManager::TaskRunnerInterface& taskRunner,
         Euroscope::EuroscopePluginLoopbackInterface& plugin,
@@ -35,11 +37,12 @@ namespace UKControllerPlugin::Releases {
         Message::UserMessager& messager,
         const int releaseDecisionCallbackId,
         int releaseCancellationCallbackId)
-        : releaseDecisionCallbackId(releaseDecisionCallbackId),
+        : releaseRequests(releaseRequests), releaseDecisionCallbackId(releaseDecisionCallbackId),
           releaseCancellationCallbackId(releaseCancellationCallbackId), controllers(controllers), plugin(plugin),
           dialogManager(dialogManager), api(api), taskRunner(taskRunner), activeCallsigns(activeCallsigns),
           windows(windows), messager(messager)
     {
+        assert(releaseRequests && "release request collection is nullptr");
     }
 
     void DepartureReleaseEventHandler::ProcessPushEvent(const Push::PushEvent& message)
@@ -62,19 +65,6 @@ namespace UKControllerPlugin::Releases {
         return {{Push::PushEventSubscription::SUB_TYPE_CHANNEL, "private-departure-releases"}};
     }
 
-    void DepartureReleaseEventHandler::AddReleaseRequest(const std::shared_ptr<DepartureReleaseRequest>& request)
-    {
-        std::lock_guard queueLock(this->releaseMapGuard);
-        this->releaseRequests[request->Id()] = request;
-    }
-
-    auto DepartureReleaseEventHandler::GetReleaseRequest(int id) -> std::shared_ptr<DepartureReleaseRequest>
-    {
-        std::lock_guard queueLock(this->releaseMapGuard);
-        auto request = this->releaseRequests.find(id);
-        return request == this->releaseRequests.cend() ? nullptr : request->second;
-    }
-
     auto DepartureReleaseEventHandler::DepartureReleaseRequestedMessageValid(const nlohmann::json& data) const -> bool
     {
         return data.is_object() && data.contains("id") && data.at("id").is_number_integer() &&
@@ -94,21 +84,21 @@ namespace UKControllerPlugin::Releases {
         -> bool
     {
         return data.is_object() && data.contains("id") && data.at("id").is_number_integer() &&
-               this->releaseRequests.find(data.at("id").get<int>()) != this->releaseRequests.cend();
+               releaseRequests->FindById(data.at("id").get<int>()) != nullptr;
     }
 
     auto DepartureReleaseEventHandler::DepartureReleaseRejectedMessageValid(const nlohmann::json& data) const -> bool
     {
         return data.is_object() && data.contains("id") && data.at("id").is_number_integer() &&
-               this->releaseRequests.find(data.at("id").get<int>()) != this->releaseRequests.cend() &&
-               data.contains("remarks") && data.at("remarks").is_string();
+               releaseRequests->FindById(data.at("id").get<int>()) != nullptr && data.contains("remarks") &&
+               data.at("remarks").is_string();
     }
 
     auto DepartureReleaseEventHandler::DepartureReleaseApprovedMessageValid(const nlohmann::json& data) const -> bool
     {
         return data.is_object() && data.contains("id") && data.at("id").is_number_integer() &&
-               this->releaseRequests.find(data.at("id").get<int>()) != this->releaseRequests.cend() &&
-               data.contains("remarks") && data.at("remarks").is_string() && data.contains("expires_at") &&
+               releaseRequests->FindById(data.at("id").get<int>()) != nullptr && data.contains("remarks") &&
+               data.at("remarks").is_string() && data.contains("expires_at") &&
                (data.at("expires_at").is_null() ||
                 (data.at("expires_at").is_string() &&
                  Time::ParseTimeString(data.at("expires_at").get<std::string>()) != Time::invalidTime)) &&
@@ -127,22 +117,20 @@ namespace UKControllerPlugin::Releases {
     /*
      * Whether releases should be removed from the lists.
      */
-    auto
-    DepartureReleaseEventHandler::ReleaseShouldBeRemoved(const std::shared_ptr<DepartureReleaseRequest>& releaseRequest)
-        -> bool
+    auto DepartureReleaseEventHandler::ReleaseShouldBeRemoved(const DepartureReleaseRequest& releaseRequest) -> bool
     {
-        if (releaseRequest->Approved()) {
-            return releaseRequest->ReleaseExpiryTime() +
+        if (releaseRequest.Approved()) {
+            return releaseRequest.ReleaseExpiryTime() +
                        std::chrono::seconds(RELEASE_DECISION_MADE_DELETE_AFTER_SECONDS) <
                    std::chrono::system_clock::now();
         }
 
-        if (releaseRequest->Rejected()) {
-            return releaseRequest->RejectedAtTime() + std::chrono::seconds(RELEASE_DECISION_MADE_DELETE_AFTER_SECONDS) <
+        if (releaseRequest.Rejected()) {
+            return releaseRequest.RejectedAtTime() + std::chrono::seconds(RELEASE_DECISION_MADE_DELETE_AFTER_SECONDS) <
                    std::chrono::system_clock::now();
         }
 
-        return releaseRequest->RequestExpiryTime() < std::chrono::system_clock::now();
+        return releaseRequest.RequestExpiryTime() < std::chrono::system_clock::now();
     }
 
     auto DepartureReleaseEventHandler::ControllerCanMakeReleaseDecision(
@@ -200,14 +188,11 @@ namespace UKControllerPlugin::Releases {
         const POINT& mousePos)
     {
         std::string callsign = flightplan.GetCallsign();
-        std::lock_guard queueLock(this->releaseMapGuard);
         std::set<std::shared_ptr<DepartureReleaseRequest>> releasesForCallsign;
-        std::for_each(
-            this->releaseRequests.cbegin(),
-            this->releaseRequests.cend(),
-            [callsign, &releasesForCallsign](const std::pair<int, std::shared_ptr<DepartureReleaseRequest>>& release) {
-                if (release.second->Callsign() == callsign) {
-                    releasesForCallsign.insert(release.second);
+        releaseRequests->Iterate(
+            [callsign, &releasesForCallsign](const std::shared_ptr<DepartureReleaseRequest>& release) {
+                if (release->Callsign() == callsign) {
+                    releasesForCallsign.insert(release);
                 }
             });
 
@@ -240,12 +225,11 @@ namespace UKControllerPlugin::Releases {
         std::set<std::shared_ptr<DepartureReleaseRequest>, CompareDepartureReleases> releases;
         auto controllerId = this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId();
 
-        std::lock_guard queueLock(this->releaseMapGuard);
-        for (const auto& release : this->releaseRequests) {
-            if (release.second->TargetController() == controllerId && release.second->RequiresDecision()) {
-                releases.insert(release.second);
+        releaseRequests->Iterate([controllerId, &releases](const std::shared_ptr<DepartureReleaseRequest>& release) {
+            if (release->TargetController() == controllerId && release->RequiresDecision()) {
+                releases.insert(release);
             }
-        }
+        });
 
         return releases;
     }
@@ -266,10 +250,11 @@ namespace UKControllerPlugin::Releases {
 
         bool menuTriggered = false;
         int userControllerId = this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId();
-        for (const auto& release : this->releaseRequests) {
-            if (release.second->RequestingController() != userControllerId ||
-                release.second->Callsign() != flightplan.GetCallsign()) {
-                continue;
+        releaseRequests->Iterate([this, &mousePos, &menuTriggered, &flightplan, &userControllerId](
+                                     const std::shared_ptr<DepartureReleaseRequest>& release) {
+            if (release->RequestingController() != userControllerId ||
+                release->Callsign() != flightplan.GetCallsign()) {
+                return;
             }
 
             // Trigger menu if not yet triggered
@@ -287,15 +272,14 @@ namespace UKControllerPlugin::Releases {
 
             // Add an item to the menu
             Plugin::PopupMenuItem menuItem;
-            menuItem.firstValue =
-                this->controllers.FetchPositionById(release.second->TargetController())->GetCallsign();
+            menuItem.firstValue = this->controllers.FetchPositionById(release->TargetController())->GetCallsign();
             menuItem.secondValue = "";
             menuItem.callbackFunctionId = this->releaseCancellationCallbackId;
             menuItem.checked = EuroScopePlugIn::POPUP_ELEMENT_NO_CHECKBOX;
             menuItem.disabled = false;
             menuItem.fixedPosition = false;
             this->plugin.AddItemToPopupList(menuItem);
-        }
+        });
     }
 
     /*
@@ -310,24 +294,21 @@ namespace UKControllerPlugin::Releases {
             return;
         }
 
-        auto releaseToCancel = std::find_if(
-            this->releaseRequests.cbegin(),
-            this->releaseRequests.cend(),
-            [fp, this, context](auto releaseRequest) -> bool {
-                return fp->GetCallsign() == releaseRequest.second->Callsign() &&
+        auto release = releaseRequests->FirstWhere(
+            [fp, this, context](const std::shared_ptr<DepartureReleaseRequest>& releaseRequest) -> bool {
+                return fp->GetCallsign() == releaseRequest->Callsign() &&
                        this->controllers.FetchPositionByCallsign(context)->GetId() ==
-                           releaseRequest.second->TargetController();
+                           releaseRequest->TargetController();
             });
 
-        if (releaseToCancel == this->releaseRequests.cend()) {
+        if (release == nullptr) {
             return;
         }
 
-        auto release = releaseToCancel->second;
         this->taskRunner.QueueAsynchronousTask([release, this]() {
             try {
                 this->api.CancelDepartureReleaseRequest(release->Id());
-                this->releaseRequests.erase(release->Id());
+                this->releaseRequests->Remove(release->Id());
             } catch (Api::ApiException& api) {
                 LogError("ApiException whilst cancelling release request");
             }
@@ -342,23 +323,15 @@ namespace UKControllerPlugin::Releases {
         }
 
         int userControllerId = this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId();
-        std::lock_guard queueLock(this->releaseMapGuard);
-        auto release = std::find_if(
-            this->releaseRequests.cbegin(),
-            this->releaseRequests.cend(),
-            [&callsign,
-             userControllerId](const std::pair<int, std::shared_ptr<DepartureReleaseRequest>>& release) -> bool {
-                return release.second->Callsign() == callsign && release.second->RequiresDecision() &&
-                       userControllerId == release.second->TargetController();
+        return releaseRequests->FirstWhere(
+            [&callsign, userControllerId](const std::shared_ptr<DepartureReleaseRequest>& release) -> bool {
+                return release->Callsign() == callsign && release->RequiresDecision() &&
+                       userControllerId == release->TargetController();
             });
-
-        return release != this->releaseRequests.cend() ? release->second : nullptr;
     }
 
     void DepartureReleaseEventHandler::SetReleaseStatusIndicatorTagData(Tag::TagData& tagData)
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
-
         /*
          * Go through all the release requests and find the most recent one for each target controller.
          */
@@ -368,33 +341,32 @@ namespace UKControllerPlugin::Releases {
         int awaitingReleasedAtTime = 0;
         int relevant = 0;
         int acknowledgements = 0;
-        for (auto releaseRequest = this->releaseRequests.rbegin(); releaseRequest != this->releaseRequests.rend();
-             ++releaseRequest
+        releaseRequests->Iterate(
+            [&approvals, &rejections, &expiries, &awaitingReleasedAtTime, &relevant, &acknowledgements, &tagData](
+                const std::shared_ptr<DepartureReleaseRequest>& releaseRequest) {
+                if (releaseRequest->Callsign() != tagData.GetFlightplan().GetCallsign()) {
+                    return;
+                }
 
-        ) {
-            if (releaseRequest->second->Callsign() != tagData.GetFlightplan().GetCallsign()) {
-                continue;
-            }
+                if (releaseRequest->Approved()) {
+                    approvals++;
+                    if (releaseRequest->ApprovalExpired()) {
+                        expiries++;
+                    }
 
-            if (releaseRequest->second->Approved()) {
-                approvals++;
-                if (releaseRequest->second->ApprovalExpired()) {
+                    if (releaseRequest->AwaitingReleasedTime()) {
+                        awaitingReleasedAtTime++;
+                    }
+                } else if (releaseRequest->Rejected()) {
+                    rejections++;
+                } else if (releaseRequest->RequestExpired()) {
                     expiries++;
+                } else if (releaseRequest->Acknowledged()) {
+                    acknowledgements++;
                 }
 
-                if (releaseRequest->second->AwaitingReleasedTime()) {
-                    awaitingReleasedAtTime++;
-                }
-            } else if (releaseRequest->second->Rejected()) {
-                rejections++;
-            } else if (releaseRequest->second->RequestExpired()) {
-                expiries++;
-            } else if (releaseRequest->second->Acknowledged()) {
-                acknowledgements++;
-            }
-
-            relevant++;
-        }
+                relevant++;
+            });
 
         // No releases, nothing to do
         if (relevant == 0) {
@@ -431,31 +403,30 @@ namespace UKControllerPlugin::Releases {
      */
     void DepartureReleaseEventHandler::SetReleaseCountdownTagData(Tag::TagData& tagData)
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
-
         std::set<std::shared_ptr<DepartureReleaseRequest>> relevantReleases;
         int releasesPendingReleaseTime = 0;
-        for (auto releaseRequest = this->releaseRequests.rbegin(); releaseRequest != this->releaseRequests.rend();
-             ++releaseRequest) {
-            if (releaseRequest->second->Callsign() != tagData.GetFlightplan().GetCallsign()) {
-                continue;
-            }
-
-            // If we find a release that isn't approved or approval has expired, do nothing
-            if (!releaseRequest->second->Approved() ||
-                (releaseRequest->second->Approved() && releaseRequest->second->ApprovalExpired())) {
+        bool releaseNotRelevant = false;
+        releaseRequests->Iterate([&relevantReleases, &releasesPendingReleaseTime, &releaseNotRelevant, &tagData](
+                                     const std::shared_ptr<DepartureReleaseRequest>& releaseRequest) {
+            if (releaseRequest->Callsign() != tagData.GetFlightplan().GetCallsign()) {
                 return;
             }
 
-            if (releaseRequest->second->AwaitingReleasedTime()) {
+            // If we find a release that isn't approved or approval has expired, do nothing
+            if (!releaseRequest->Approved() || (releaseRequest->Approved() && releaseRequest->ApprovalExpired())) {
+                releaseNotRelevant = true;
+                return;
+            }
+
+            if (releaseRequest->AwaitingReleasedTime()) {
                 releasesPendingReleaseTime++;
             }
 
-            relevantReleases.insert(releaseRequest->second);
-        }
+            relevantReleases.insert(releaseRequest);
+        });
 
         // No releases, nothing to do
-        if (relevantReleases.empty()) {
+        if (releaseNotRelevant || relevantReleases.empty()) {
             return;
         }
 
@@ -530,7 +501,6 @@ namespace UKControllerPlugin::Releases {
      */
     void DepartureReleaseEventHandler::ProcessDepartureReleaseRequestedMessage(const nlohmann::json& data)
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
         if (!DepartureReleaseRequestedMessageValid(data)) {
             LogError("Invalid departure release requested message");
             return;
@@ -540,23 +510,18 @@ namespace UKControllerPlugin::Releases {
         int releaseRequestId = data.at("id").get<int>();
         int targetController = data.at("target_controller").get<int>();
         auto callsign = data.at("callsign").get<std::string>();
-        this->releaseRequests[data.at("id").get<int>()] = std::make_shared<DepartureReleaseRequest>(
+        releaseRequests->Add(std::make_shared<DepartureReleaseRequest>(
             releaseRequestId,
             callsign,
             data.at("requesting_controller").get<int>(),
             targetController,
-            Time::ParseTimeString(data.at("expires_at").get<std::string>()));
+            Time::ParseTimeString(data.at("expires_at").get<std::string>())));
 
-        // Remove any others for the same callsign and controller
-        for (auto releaseRequest = this->releaseRequests.begin(); releaseRequest != this->releaseRequests.end();) {
-            if (releaseRequest->second->Callsign() == callsign &&
-                releaseRequest->second->TargetController() == targetController &&
-                releaseRequest->second->Id() != releaseRequestId) {
-                releaseRequest = this->releaseRequests.erase(releaseRequest);
-            } else {
-                ++releaseRequest;
-            }
-        }
+        releaseRequests->RemoveWhere(
+            [&callsign, &targetController, &releaseRequestId](const DepartureReleaseRequest& releaseRequest) -> bool {
+                return releaseRequest.Callsign() == callsign && releaseRequest.TargetController() == targetController &&
+                       releaseRequest.Id() != releaseRequestId;
+            });
 
         // Play a sound to alert the controller if we are the target
         if (this->activeCallsigns.UserHasCallsign() &&
@@ -570,13 +535,12 @@ namespace UKControllerPlugin::Releases {
      */
     void DepartureReleaseEventHandler::ProcessRequestAcknowledgedMessage(const nlohmann::json& data)
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
         if (!DepartureReleaseAcknowledgedMessageValid(data)) {
             LogError("Invalid departure release acknowledged message");
             return;
         }
 
-        this->releaseRequests.find(data.at("id").get<int>())->second->Acknowledge();
+        releaseRequests->FindById(data.at("id").get<int>())->Acknowledge();
     }
 
     /**
@@ -584,13 +548,12 @@ namespace UKControllerPlugin::Releases {
      */
     void DepartureReleaseEventHandler::ProcessRequestRejectedMessage(const nlohmann::json& data)
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
         if (!DepartureReleaseRejectedMessageValid(data)) {
             LogError("Invalid departure release rejected message");
             return;
         }
 
-        auto release = this->releaseRequests.find(data.at("id").get<int>())->second;
+        auto release = releaseRequests->FindById(data.at("id").get<int>());
         release->Reject(data.at("remarks").get<std::string>());
 
         // Play a sound to alert the controller if we requested it
@@ -609,13 +572,12 @@ namespace UKControllerPlugin::Releases {
      */
     void DepartureReleaseEventHandler::ProcessRequestApprovedMessage(const nlohmann::json& data)
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
         if (!DepartureReleaseApprovedMessageValid(data)) {
             LogError("Invalid departure release approved message");
             return;
         }
 
-        auto release = this->releaseRequests.find(data.at("id").get<int>())->second;
+        auto release = releaseRequests->FindById(data.at("id").get<int>());
         if (data.at("expires_at").is_null()) {
             release->Approve(
                 Time::ParseTimeString(data.at("released_at").get<std::string>()),
@@ -648,8 +610,7 @@ namespace UKControllerPlugin::Releases {
             return;
         }
 
-        std::lock_guard queueLock(this->releaseMapGuard);
-        this->releaseRequests.erase(data.at("id").get<int>());
+        this->releaseRequests->Remove(data.at("id").get<int>());
     }
 
     /*
@@ -658,14 +619,8 @@ namespace UKControllerPlugin::Releases {
      */
     void DepartureReleaseEventHandler::TimedEventTrigger()
     {
-        std::lock_guard queueLock(this->releaseMapGuard);
-        for (auto release = this->releaseRequests.cbegin(); release != this->releaseRequests.cend();) {
-            if (this->ReleaseShouldBeRemoved(release->second)) {
-                release = this->releaseRequests.erase(release);
-            } else {
-                ++release;
-            }
-        }
+        releaseRequests->RemoveWhere(
+            [](const DepartureReleaseRequest& release) -> bool { return ReleaseShouldBeRemoved(release); });
     }
 
     /*
@@ -812,7 +767,7 @@ namespace UKControllerPlugin::Releases {
                     return;
                 }
 
-                this->AddReleaseRequest(std::make_shared<DepartureReleaseRequest>(
+                releaseRequests->Add(std::make_shared<DepartureReleaseRequest>(
                     response.at("id").get<int>(),
                     callsign,
                     userPositionId,
@@ -833,7 +788,7 @@ namespace UKControllerPlugin::Releases {
     void DepartureReleaseEventHandler::ApproveRelease(
         int releaseId, std::chrono::system_clock::time_point releasedAt, int expiresInSeconds, std::string remarks)
     {
-        auto release = this->GetReleaseRequest(releaseId);
+        auto release = releaseRequests->FindById(releaseId);
         if (!this->ControllerCanMakeReleaseDecision(release)) {
             return;
         }
@@ -857,7 +812,7 @@ namespace UKControllerPlugin::Releases {
 
     void DepartureReleaseEventHandler::RejectRelease(int releaseId, std::string remarks)
     {
-        auto release = this->GetReleaseRequest(releaseId);
+        auto release = releaseRequests->FindById(releaseId);
         if (!this->ControllerCanMakeReleaseDecision(release)) {
             return;
         }

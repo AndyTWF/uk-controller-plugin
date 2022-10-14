@@ -7,10 +7,11 @@
 #include "releases/DepartureReleaseColours.h"
 #include "releases/DepartureReleaseEventHandler.h"
 #include "releases/DepartureReleaseRequest.h"
+#include "releases/DepartureReleaseRequestCollection.h"
 #include "releases/DepartureReleaseRequestView.h"
+#include "tag/TagData.h"
 #include "time/ParseTimeStrings.h"
 #include "time/SystemClock.h"
-#include "tag/TagData.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -24,6 +25,7 @@ using UKControllerPlugin::Push::PushEvent;
 using UKControllerPlugin::Releases::CompareDepartureReleases;
 using UKControllerPlugin::Releases::DepartureReleaseEventHandler;
 using UKControllerPlugin::Releases::DepartureReleaseRequest;
+using UKControllerPlugin::Releases::DepartureReleaseRequestCollection;
 using UKControllerPlugin::Time::ParseTimeString;
 using UKControllerPlugin::Time::TimeNow;
 
@@ -34,8 +36,18 @@ namespace UKControllerPluginTest::Releases {
         public:
         DepartureReleaseEventHandlerTest()
             : dialogManager(dialogProvider), messager(mockPlugin),
-              handler(
-                  api, mockTaskRunner, mockPlugin, controllers, activeCallsigns, dialogManager, windows, messager, 3, 4)
+              releaseCollection(std::make_shared<DepartureReleaseRequestCollection>()), handler(
+                                                                                            releaseCollection,
+                                                                                            api,
+                                                                                            mockTaskRunner,
+                                                                                            mockPlugin,
+                                                                                            controllers,
+                                                                                            activeCallsigns,
+                                                                                            dialogManager,
+                                                                                            windows,
+                                                                                            messager,
+                                                                                            3,
+                                                                                            4)
         {
             request = std::make_shared<DepartureReleaseRequest>(
                 1, "BAW123", 3, 2, std::chrono::system_clock::now() + std::chrono::minutes(5));
@@ -108,6 +120,7 @@ namespace UKControllerPluginTest::Releases {
         ControllerPositionCollection controllers;
         std::shared_ptr<DepartureReleaseRequest> request;
         UserMessager messager;
+        std::shared_ptr<DepartureReleaseRequestCollection> releaseCollection;
         DepartureReleaseEventHandler handler;
     };
 
@@ -120,7 +133,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItAcknowledgesTheRequestFromMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
 
@@ -175,7 +188,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItRejectsTheRequestFromMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -189,7 +202,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntPlayASoundOnRejectionIfUserNotActive)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -204,7 +217,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntPlayASoundOnRejectionIfUserIsNotRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller1Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -219,7 +232,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItPlaysASoundOnRejectionIfUserIsRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller2Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -233,7 +246,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntSendRemarksMessageToUserIfUserNotActive)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -248,7 +261,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntSendRemarksMessageToUserIfUserIsNotRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller1Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -263,7 +276,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntSendRemarksMessageToUserIfRemarksEmpty)
     {
         activeCallsigns.AddUserCallsign(*controller2Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "";
@@ -278,7 +291,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItSendRemarksMessageToUserIfUserIsRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller2Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["remarks"] = "Some remarks";
@@ -374,66 +387,66 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItCancelsTheRequestFromMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
 
         PushEvent message{"departure_release.request_cancelled", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesMissingIdInCancelMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["not_id"] = 1;
 
         PushEvent message{"departure_release.request_cancelled", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_NE(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesIdNotAnIntegerInCancelMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = "abc";
 
         PushEvent message{"departure_release.request_cancelled", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_NE(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesIdNotValidInCancelMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 2;
 
         PushEvent message{"departure_release.request_cancelled", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_NE(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesCancelMessageNotAnObject)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data = nlohmann::json::array();
 
         PushEvent message{"departure_release.request_cancelled", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_NE(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItApprovesTheRequestFromMessage)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -452,7 +465,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItApprovesTheRequestFromMessageWithNoExpiry)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = nlohmann::json::value_t::null;
@@ -469,7 +482,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntPlayASoundOnApproveIfUserNotActive)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -486,7 +499,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntPlayASoundOnApproveIfUserNotRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller1Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -503,7 +516,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItPlaysASoundOnApproveIfUserRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller2Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -519,7 +532,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntSendRemarksMessageOnApprovalIfUserNotActive)
     {
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -536,7 +549,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntSendApprovalRemarksMessageIfUserNotRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller1Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -553,7 +566,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntSendApprovalRemarksMessageIfRemarksEmpty)
     {
         activeCallsigns.AddUserCallsign(*controller2Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -570,7 +583,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItSendsApprovalMessageIfUserRequestingController)
     {
         activeCallsigns.AddUserCallsign(*controller2Callsign);
-        handler.AddReleaseRequest(request);
+        releaseCollection->Add(request);
         nlohmann::json data;
         data["id"] = 1;
         data["expires_at"] = "2021-05-12 20:00:00";
@@ -761,7 +774,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        auto release = handler.GetReleaseRequest(2);
+        auto release = releaseCollection->FindById(2);
         EXPECT_EQ(2, release->Id());
         EXPECT_EQ("BAW123", release->Callsign());
         EXPECT_EQ(2, release->RequestingController());
@@ -831,7 +844,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        auto release = handler.GetReleaseRequest(1);
+        auto release = releaseCollection->FindById(1);
         EXPECT_EQ(1, release->Id());
         EXPECT_EQ("BAW123", release->Callsign());
         EXPECT_EQ(2, release->RequestingController());
@@ -849,10 +862,10 @@ namespace UKControllerPluginTest::Releases {
         data["expires_at"] = "2021-05-12 19:55:00";
 
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
-        handler.AddReleaseRequest(this->request);
+        releaseCollection->Add(this->request);
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemoveReleaseOnRequestIfDifferentTargetController)
@@ -865,10 +878,10 @@ namespace UKControllerPluginTest::Releases {
         data["expires_at"] = "2021-05-12 19:55:00";
 
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
-        handler.AddReleaseRequest(this->request);
+        releaseCollection->Add(this->request);
 
         handler.ProcessPushEvent(message);
-        EXPECT_NE(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemoveReleaseOnRequestIfDifferentCallsign)
@@ -881,10 +894,10 @@ namespace UKControllerPluginTest::Releases {
         data["expires_at"] = "2021-05-12 19:55:00";
 
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
-        handler.AddReleaseRequest(this->request);
+        releaseCollection->Add(this->request);
 
         handler.ProcessPushEvent(message);
-        EXPECT_NE(nullptr, handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesMissingIdInCreateMessage)
@@ -898,7 +911,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesIdNotIntegerInCreateMessage)
@@ -913,7 +926,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.requested", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesCallsignMissingInCreateMessage)
@@ -927,7 +940,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesCallsignNotAStringInCreateMessage)
@@ -942,7 +955,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesRequestingControllerMissingInCreateMessage)
@@ -956,7 +969,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesRequestingControllerNotAnIntegerInCreateMessage)
@@ -971,7 +984,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesRequestingControllerNotARealControllerInCreateMessage)
@@ -986,7 +999,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesTargetControllerMissingInCreateMessage)
@@ -1000,7 +1013,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesTargetControllerNotIntInCreateMessage)
@@ -1015,7 +1028,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesTargetControllerNotARealControllerInCreateMessage)
@@ -1030,7 +1043,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesExpiresAtMissingInCreateMessage)
@@ -1044,7 +1057,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesExpiresAtNotStringInCreateMessage)
@@ -1059,7 +1072,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesExpiresAtNotValidTimestampInCreateMessage)
@@ -1074,7 +1087,7 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItNotObjectInCreateMessage)
@@ -1084,25 +1097,25 @@ namespace UKControllerPluginTest::Releases {
         PushEvent message{"departure_release.approved", "private-departure-releases", data};
 
         handler.ProcessPushEvent(message);
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(2));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemovePendingReleases)
     {
         std::shared_ptr<DepartureReleaseRequest> relevantRelease =
             std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() + std::chrono::minutes(5));
-        handler.AddReleaseRequest(relevantRelease);
+        releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
-        EXPECT_EQ(relevantRelease, handler.GetReleaseRequest(4));
+        EXPECT_EQ(relevantRelease, releaseCollection->FindById(4));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItRemovesPendingReleasesThatHaveExpired)
     {
         std::shared_ptr<DepartureReleaseRequest> relevantRelease =
             std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(5));
-        handler.AddReleaseRequest(relevantRelease);
+        releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(4));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(4));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemoveRecentlyExpiredApprovals)
@@ -1110,9 +1123,9 @@ namespace UKControllerPluginTest::Releases {
         std::shared_ptr<DepartureReleaseRequest> relevantRelease =
             std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(1));
         relevantRelease->Approve(std::chrono::system_clock::now(), TimeNow() - std::chrono::seconds(80), "remarks");
-        handler.AddReleaseRequest(relevantRelease);
+        releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
-        EXPECT_EQ(relevantRelease, handler.GetReleaseRequest(4));
+        EXPECT_EQ(relevantRelease, releaseCollection->FindById(4));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItExpiresRemovesThatHaveApprovalExpired)
@@ -1120,9 +1133,9 @@ namespace UKControllerPluginTest::Releases {
         std::shared_ptr<DepartureReleaseRequest> relevantRelease =
             std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(1));
         relevantRelease->Approve(std::chrono::system_clock::now(), TimeNow() - std::chrono::seconds(91), "remarks");
-        handler.AddReleaseRequest(relevantRelease);
+        releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(4));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(4));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemoveRecentlyRejectedReleases)
@@ -1130,9 +1143,9 @@ namespace UKControllerPluginTest::Releases {
         std::shared_ptr<DepartureReleaseRequest> relevantRelease =
             std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(1));
         relevantRelease->Reject("remarks");
-        handler.AddReleaseRequest(relevantRelease);
+        releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
-        EXPECT_EQ(relevantRelease, handler.GetReleaseRequest(4));
+        EXPECT_EQ(relevantRelease, releaseCollection->FindById(4));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItExpiresReleasesThatHaveRejectionExpired)
@@ -1140,9 +1153,9 @@ namespace UKControllerPluginTest::Releases {
         std::shared_ptr<DepartureReleaseRequest> relevantRelease =
             std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() + std::chrono::seconds(5));
         relevantRelease->Approve(std::chrono::system_clock::now(), TimeNow() - std::chrono::seconds(91), "remarks");
-        handler.AddReleaseRequest(relevantRelease);
+        releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
-        EXPECT_EQ(nullptr, handler.GetReleaseRequest(4));
+        EXPECT_EQ(nullptr, releaseCollection->FindById(4));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntOpenRequestDialogIfUserNotActive)
@@ -1181,7 +1194,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntOpenDecisionMenuIfReleaseForCallsignAlreadyActioned)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         this->request->Reject("remarks");
 
         EXPECT_CALL(this->mockPlugin, TriggerPopupList(testing::_, testing::_, testing::_)).Times(0);
@@ -1193,7 +1206,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntOpenDecisionMenuIfNoUserCallsign)
     {
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         EXPECT_CALL(this->mockPlugin, TriggerPopupList(testing::_, testing::_, testing::_)).Times(0);
 
@@ -1205,7 +1218,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntOpenDecisionMenuIfUserCallsignCannotActionReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         EXPECT_CALL(this->mockPlugin, TriggerPopupList(testing::_, testing::_, testing::_)).Times(0);
 
@@ -1217,7 +1230,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItOpensDecisionMenu)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         EXPECT_CALL(this->mockPlugin, SetEuroscopeSelectedFlightplanReference(testing::Ref(this->mockFlightplan)))
             .Times(1);
@@ -1261,7 +1274,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionMadeDoesNothingIfPluginDoesntReturnFlightplan)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(testing::Return(nullptr));
 
@@ -1283,7 +1296,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionMadeDoesNothingIfNoUserCallsign)
     {
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
@@ -1295,7 +1308,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionMadeDoesNothingIfUserCannotDecide)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
@@ -1307,7 +1320,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionMadeOpensApprovalDialog)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
@@ -1319,7 +1332,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionMadeOpensRejectionDialog)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
@@ -1331,7 +1344,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionMadeAcknowledgesRelease)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
@@ -1345,7 +1358,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleaseDecisionHandlesApiExceptionOnAcknowledge)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
@@ -1397,7 +1410,7 @@ namespace UKControllerPluginTest::Releases {
             .WillOnce(testing::Return(responseData));
 
         this->handler.RequestRelease("BAW123", 4);
-        EXPECT_EQ(nullptr, this->handler.GetReleaseRequest(22));
+        EXPECT_EQ(nullptr, this->releaseCollection->FindById(22));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, RequestReleaseHandlesIdNotIntgerFromResponseData)
@@ -1410,7 +1423,7 @@ namespace UKControllerPluginTest::Releases {
             .WillOnce(testing::Return(responseData));
 
         this->handler.RequestRelease("BAW123", 4);
-        EXPECT_EQ(nullptr, this->handler.GetReleaseRequest(22));
+        EXPECT_EQ(nullptr, this->releaseCollection->FindById(22));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, RequestReleaseHandlesApiException)
@@ -1422,7 +1435,7 @@ namespace UKControllerPluginTest::Releases {
             .WillOnce(testing::Throw(UKControllerPlugin::Api::ApiException("foo")));
 
         this->handler.RequestRelease("BAW123", 4);
-        EXPECT_EQ(nullptr, this->handler.GetReleaseRequest(22));
+        EXPECT_EQ(nullptr, this->releaseCollection->FindById(22));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, RequestReleaseRequestsRelease)
@@ -1435,7 +1448,7 @@ namespace UKControllerPluginTest::Releases {
             .WillOnce(testing::Return(responseData));
 
         this->handler.RequestRelease("BAW123", 4);
-        auto release = this->handler.GetReleaseRequest(22);
+        auto release = this->releaseCollection->FindById(22);
         EXPECT_NE(nullptr, release);
         EXPECT_EQ(22, release->Id());
         EXPECT_EQ("BAW123", release->Callsign());
@@ -1453,7 +1466,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntApproveReleasesIfNoUserCallsign)
     {
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, ApproveDepartureReleaseRequest).Times(0);
 
         this->handler.ApproveRelease(1, TimeNow(), 60, "remarks");
@@ -1462,7 +1475,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntApproveReleasesIfUserCallsignCantApproveReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, ApproveDepartureReleaseRequest).Times(0);
 
         this->handler.ApproveRelease(1, TimeNow(), 60, "remarks");
@@ -1471,24 +1484,24 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesApiExceptionApprovingReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, ApproveDepartureReleaseRequest(1, 2, UKControllerPlugin::Time::TimeNow(), 60, "remarks"))
             .Times(1)
             .WillOnce(testing::Throw(UKControllerPlugin::Api::ApiException("foo")));
 
         this->handler.ApproveRelease(1, TimeNow(), 60, "remarks");
-        EXPECT_FALSE(this->handler.GetReleaseRequest(1)->Approved());
+        EXPECT_FALSE(this->releaseCollection->FindById(1)->Approved());
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItApprovesReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, ApproveDepartureReleaseRequest(1, 2, UKControllerPlugin::Time::TimeNow(), 60, "remarks"))
             .Times(1);
 
         this->handler.ApproveRelease(1, TimeNow(), 60, "remarks");
-        auto release = this->handler.GetReleaseRequest(1);
+        auto release = this->releaseCollection->FindById(1);
         EXPECT_TRUE(release->Approved());
         EXPECT_FALSE(release->ApprovedWithNoExpiry());
         EXPECT_EQ(UKControllerPlugin::Time::TimeNow(), release->ReleasedAtTime());
@@ -1499,12 +1512,12 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItApprovesReleasesWithNoExpiry)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, ApproveDepartureReleaseRequest(1, 2, UKControllerPlugin::Time::TimeNow(), -1, "remarks"))
             .Times(1);
 
         this->handler.ApproveRelease(1, TimeNow(), -1, "remarks");
-        auto release = this->handler.GetReleaseRequest(1);
+        auto release = this->releaseCollection->FindById(1);
         EXPECT_TRUE(release->Approved());
         EXPECT_TRUE(release->ApprovedWithNoExpiry());
         EXPECT_EQ(UKControllerPlugin::Time::TimeNow(), release->ReleasedAtTime());
@@ -1520,7 +1533,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRejectReleasesIfNoUserCallsign)
     {
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, RejectDepartureReleaseRequest).Times(0);
 
         this->handler.RejectRelease(1, "remarks");
@@ -1529,7 +1542,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRejectReleasesIfUserCallsignCantRejectReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, RejectDepartureReleaseRequest).Times(0);
 
         this->handler.RejectRelease(1, "remarks");
@@ -1538,23 +1551,23 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesApiExceptionRejectingReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, RejectDepartureReleaseRequest(1, 2, "remarks"))
             .Times(1)
             .WillOnce(testing::Throw(UKControllerPlugin::Api::ApiException("foo")));
 
         this->handler.RejectRelease(1, "remarks");
-        EXPECT_FALSE(this->handler.GetReleaseRequest(1)->Rejected());
+        EXPECT_FALSE(this->releaseCollection->FindById(1)->Rejected());
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItRejectsReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(this->request);
+        this->releaseCollection->Add(this->request);
         EXPECT_CALL(this->api, RejectDepartureReleaseRequest(1, 2, "remarks")).Times(1);
 
         this->handler.RejectRelease(1, "remarks");
-        auto release = this->handler.GetReleaseRequest(1);
+        auto release = this->releaseCollection->FindById(1);
         EXPECT_TRUE(release->Rejected());
         EXPECT_EQ("remarks", release->Remarks());
     }
@@ -1566,7 +1579,7 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsNormalIfNoReleases)
     {
-        this->handler.AddReleaseRequest(std::make_shared<DepartureReleaseRequest>(
+        this->releaseCollection->Add(std::make_shared<DepartureReleaseRequest>(
             1, "BAW456", 3, 2, std::chrono::system_clock::now() + std::chrono::minutes(5)));
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1580,8 +1593,8 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1596,8 +1609,8 @@ namespace UKControllerPluginTest::Releases {
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1614,8 +1627,8 @@ namespace UKControllerPluginTest::Releases {
         request->Acknowledge();
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1630,8 +1643,8 @@ namespace UKControllerPluginTest::Releases {
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Approve(TimeNow() + std::chrono::seconds(5), TimeNow() + std::chrono::seconds(25), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1646,8 +1659,8 @@ namespace UKControllerPluginTest::Releases {
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Approve(TimeNow() - std::chrono::seconds(35), TimeNow() - std::chrono::seconds(25), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1662,8 +1675,8 @@ namespace UKControllerPluginTest::Releases {
         request2->Acknowledge();
         request->Acknowledge();
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1677,8 +1690,8 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() - std::chrono::minutes(5));
         request->Approve(TimeNow() + std::chrono::seconds(15), TimeNow() + std::chrono::seconds(25), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1693,8 +1706,8 @@ namespace UKControllerPluginTest::Releases {
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Reject("remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
@@ -1711,7 +1724,7 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(10), "remarks");
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("0:10", data.GetItemString());
@@ -1722,7 +1735,7 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(30), "remarks");
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("0:30", data.GetItemString());
@@ -1733,7 +1746,7 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(90), "remarks");
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("1:30", data.GetItemString());
@@ -1747,8 +1760,8 @@ namespace UKControllerPluginTest::Releases {
         auto request2 =
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("0:25", data.GetItemString());
@@ -1762,8 +1775,8 @@ namespace UKControllerPluginTest::Releases {
         auto request2 =
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), "remarks");
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("1:30", data.GetItemString());
@@ -1777,8 +1790,8 @@ namespace UKControllerPluginTest::Releases {
         auto request2 =
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), "remarks");
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("", data.GetItemString());
@@ -1793,8 +1806,8 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() + std::chrono::seconds(50), TimeNow() + std::chrono::seconds(90), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("0:50", data.GetItemString());
@@ -1809,8 +1822,8 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() + std::chrono::seconds(50), TimeNow() + std::chrono::seconds(90), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("1:05", data.GetItemString());
@@ -1824,8 +1837,8 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() - std::chrono::seconds(50), TimeNow() + std::chrono::seconds(90), "remarks");
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("", data.GetItemString());
@@ -1839,7 +1852,7 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() - std::chrono::seconds(50), TimeNow() - std::chrono::seconds(10), "remarks");
 
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("", data.GetItemString());
@@ -1853,7 +1866,7 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(2, "BAW456", 2, 3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() - std::chrono::seconds(50), TimeNow() - std::chrono::seconds(10), "remarks");
 
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request2);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("", data.GetItemString());
@@ -1865,8 +1878,8 @@ namespace UKControllerPluginTest::Releases {
         auto request2 =
             std::make_shared<DepartureReleaseRequest>(2, "BAW456", 2, 3, TimeNow() + std::chrono::minutes(5));
 
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         this->handler.ShowStatusDisplay(this->mockFlightplan, this->mockRadarTarget, "", {101, 202});
         EXPECT_EQ(1, this->handler.GetReleasesToDisplay().size());
@@ -1882,7 +1895,7 @@ namespace UKControllerPluginTest::Releases {
         auto request2 =
             std::make_shared<DepartureReleaseRequest>(2, "BAW456", 2, 3, TimeNow() + std::chrono::minutes(5));
 
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request2);
 
         this->handler.ShowStatusDisplay(this->mockFlightplan, this->mockRadarTarget, "", {101, 202});
         EXPECT_EQ(0, this->handler.GetReleasesToDisplay().size());
@@ -1892,7 +1905,7 @@ namespace UKControllerPluginTest::Releases {
     {
         EXPECT_CALL(this->mockPlugin, TriggerPopupList(testing::_, testing::_, testing::_)).Times(0);
 
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
 
         this->handler.SelectReleaseRequestToCancel(this->mockFlightplan, this->mockRadarTarget, "", {101, 202});
     }
@@ -1920,10 +1933,10 @@ namespace UKControllerPluginTest::Releases {
             4,
             TimeNow() + std::chrono::minutes(5)); // Will show
 
-        this->handler.AddReleaseRequest(request4);
-        this->handler.AddReleaseRequest(request3);
-        this->handler.AddReleaseRequest(request2);
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request4);
+        this->releaseCollection->Add(request3);
+        this->releaseCollection->Add(request2);
+        this->releaseCollection->Add(request);
 
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
 
@@ -1959,7 +1972,7 @@ namespace UKControllerPluginTest::Releases {
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(testing::Return(nullptr));
 
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
         this->handler.RequestCancelled(4, "EGFF_APP", {});
     }
@@ -1973,10 +1986,10 @@ namespace UKControllerPluginTest::Releases {
         auto request2 =
             std::make_shared<DepartureReleaseRequest>(2, "BAW456", 3, 2, TimeNow() + std::chrono::minutes(5));
 
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request2);
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
         this->handler.RequestCancelled(4, "EGFF_APP", {});
-        EXPECT_NE(nullptr, this->handler.GetReleaseRequest(2));
+        EXPECT_NE(nullptr, this->releaseCollection->FindById(2));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntCancelTheRequestIfWrongController)
@@ -1985,10 +1998,10 @@ namespace UKControllerPluginTest::Releases {
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
         this->handler.RequestCancelled(4, "LON_W_CTR", {});
-        EXPECT_NE(nullptr, this->handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, this->releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItCancelsTheRequest)
@@ -1997,10 +2010,10 @@ namespace UKControllerPluginTest::Releases {
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
         this->handler.RequestCancelled(4, "EGFF_APP", {});
-        EXPECT_EQ(nullptr, this->handler.GetReleaseRequest(1));
+        EXPECT_EQ(nullptr, this->releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, ItHandlesApiExceptionWhenCancellingTheRequest)
@@ -2011,10 +2024,10 @@ namespace UKControllerPluginTest::Releases {
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
         this->handler.RequestCancelled(4, "EGFF_APP", {});
-        EXPECT_NE(nullptr, this->handler.GetReleaseRequest(1));
+        EXPECT_NE(nullptr, this->releaseCollection->FindById(1));
     }
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseRequestingControllerATagItemDescription)
@@ -2025,7 +2038,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseRequestingControllerSetsLeadControllerCallsign)
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(126);
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
         this->activeCallsigns.AddCallsign(*this->controller2Callsign);
 
@@ -2037,7 +2050,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseRequestingControllerSetsFallbackCallsign)
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(126);
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
 
         this->handler.SetTagItemData(data);
@@ -2048,7 +2061,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseRequestingControllerDoesNothingIfNoUserCallsign)
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(126);
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
 
         this->handler.SetTagItemData(data);
         EXPECT_EQ("", data.GetItemString());
@@ -2079,7 +2092,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleasesRequiringUserIgnoresDecidedReleases)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
         this->request->Reject("remarks");
 
         EXPECT_TRUE(this->handler.GetReleasesRequiringUsersDecision().empty());
@@ -2088,7 +2101,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, ReleasesRequiringUserIgnoresReleasesForOtherControllers)
     {
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
-        this->handler.AddReleaseRequest(request);
+        this->releaseCollection->Add(request);
 
         EXPECT_TRUE(this->handler.GetReleasesRequiringUsersDecision().empty());
     }
@@ -2102,9 +2115,9 @@ namespace UKControllerPluginTest::Releases {
             std::make_shared<DepartureReleaseRequest>(5, "BAW789", 3, 2, TimeNow() + std::chrono::minutes(5));
 
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
-        this->handler.AddReleaseRequest(request3);
-        this->handler.AddReleaseRequest(request);
-        this->handler.AddReleaseRequest(request2);
+        this->releaseCollection->Add(request3);
+        this->releaseCollection->Add(request);
+        this->releaseCollection->Add(request2);
 
         const auto releasesRequringUser = this->handler.GetReleasesRequiringUsersDecision();
         EXPECT_EQ(3, releasesRequringUser.size());
