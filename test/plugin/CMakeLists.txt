@@ -366,7 +366,7 @@ set(test__mock
     mock/MockBootstrapProvider.h
     mock/MockPluginSettingsProvider.h
     mock/MockPrenoteMessageEventHandlerInterface.h
-    mock/MockPrenoteUserRelevanceChecker.h mock/MockCoordinationChatAreaMessage.h)
+    mock/MockPrenoteUserRelevanceChecker.h mock/MockCoordinationChatAreaMessage.h mock/MockDepartureReleaseRequestEventHandlerInterface.h)
 source_group("test\\mock" FILES ${test__mock})
 
 set(test__navaids
@@ -496,7 +496,7 @@ set(test__releases
     "releases/EnrouteReleaseTypesSerializerTest.cpp"
     "releases/ReleaseModuleTest.cpp"
     releases/ReleaseApprovalRemarksUserMessageTest.cpp
-    releases/ReleaseRejectionRemarksUserMessageTest.cpp releases/DepartureReleaseRequestCollectionTest.cpp)
+    releases/ReleaseRejectionRemarksUserMessageTest.cpp releases/DepartureReleaseRequestCollectionTest.cpp releases/DepartureReleaseRequestEventHandlerCollectionTest.cpp)
 source_group("test\\releases" FILES ${test__releases})
 
 set(test__runway

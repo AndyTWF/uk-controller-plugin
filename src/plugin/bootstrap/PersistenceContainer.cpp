@@ -57,6 +57,7 @@
 #include "radarscreen/ScreenControls.h"
 #include "regional/RegionalPressureManager.h"
 #include "releases/DepartureReleaseEventHandler.h"
+#include "releases/DepartureReleaseRequestEventHandlerCollection.h"
 #include "runway/RunwayCollection.h"
 #include "sectorfile/RunwayCollection.h"
 #include "setting/SettingRepository.h"

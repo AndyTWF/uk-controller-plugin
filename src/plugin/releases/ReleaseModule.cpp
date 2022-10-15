@@ -2,6 +2,7 @@
 #include "CompareEnrouteReleaseTypes.h"
 #include "DepartureReleaseEventHandler.h"
 #include "DepartureReleaseRequestCollection.h"
+#include "DepartureReleaseRequestEventHandlerCollection.h"
 #include "DepartureReleaseRequestView.h"
 #include "EnrouteReleaseEventHandler.h"
 #include "EnrouteReleaseTypesSerializer.h"
@@ -25,10 +26,6 @@ using UKControllerPlugin::Dependency::DependencyLoaderInterface;
 using UKControllerPlugin::Euroscope::CallbackFunction;
 using UKControllerPlugin::Euroscope::EuroscopeFlightplanListInterface;
 using UKControllerPlugin::Euroscope::EuroscopePluginLoopbackInterface;
-using UKControllerPlugin::Releases::ApproveDepartureReleaseDialog;
-using UKControllerPlugin::Releases::DepartureReleaseEventHandler;
-using UKControllerPlugin::Releases::DepartureReleaseRequestView;
-using UKControllerPlugin::Releases::RequestDepartureReleaseDialog;
 using UKControllerPlugin::Tag::TagFunction;
 
 namespace UKControllerPlugin::Releases {
@@ -110,6 +107,9 @@ namespace UKControllerPlugin::Releases {
         container.controllerHandoffHandlers->RegisterHandler(handler);
 
         // Everything to do with DEPARTURE releases
+
+        // Create collection of event handlers
+        container.releaseRequestHandlers = std::make_unique<DepartureReleaseRequestEventHandlerCollection>();
 
         // Create the event handler
         const int releaseDecisionCallbackId = container.pluginFunctionHandlers->ReserveNextDynamicFunctionId();
