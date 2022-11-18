@@ -195,7 +195,7 @@ namespace UKControllerPlugin::Departure {
                     const int controllerId =
                         listItem.index() == 0
                             ? std::get<std::shared_ptr<Releases::DepartureReleaseRequest>>(listItem)
-                                  ->RequestingController()
+                                  ->RequestingControllerId()
                             : std::get<std::shared_ptr<Prenote::PrenoteMessage>>(listItem)->GetSendingControllerId();
                     const std::wstring controller = HelperFunctions::ConvertToWideString(
                         this->controllers.FetchPositionById(controllerId)->GetCallsign());

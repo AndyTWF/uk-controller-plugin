@@ -49,9 +49,6 @@ namespace UKControllerPluginTest::Releases {
                                                                                             3,
                                                                                             4)
         {
-            request = std::make_shared<DepartureReleaseRequest>(
-                1, "BAW123", 3, 2, std::chrono::system_clock::now() + std::chrono::minutes(5));
-
             // Add position 1
             position1 = std::make_shared<ControllerPosition>(
                 2, "EGFF_APP", 125.850, std::vector<std::string>{"EGGD", "EGFF"}, true, true);
@@ -68,6 +65,9 @@ namespace UKControllerPluginTest::Releases {
             position3 = std::make_shared<ControllerPosition>(
                 4, "LON_W_CTR", 126.020, std::vector<std::string>{"EGGD", "EGFF"}, true, true);
             controllers.AddPosition(position3);
+
+            request = std::make_shared<DepartureReleaseRequest>(
+                1, "BAW123", position2, position1, std::chrono::system_clock::now() + std::chrono::minutes(5));
 
             ON_CALL(this->mockFlightplan, GetCallsign).WillByDefault(testing::Return("BAW123"));
 
@@ -777,8 +777,8 @@ namespace UKControllerPluginTest::Releases {
         auto release = releaseCollection->FindById(2);
         EXPECT_EQ(2, release->Id());
         EXPECT_EQ("BAW123", release->Callsign());
-        EXPECT_EQ(2, release->RequestingController());
-        EXPECT_EQ(3, release->TargetController());
+        EXPECT_EQ(2, release->RequestingControllerId());
+        EXPECT_EQ(3, release->TargetControllerId());
         EXPECT_EQ(ParseTimeString("2021-05-12 19:55:00"), release->RequestExpiryTime());
     }
 
@@ -847,8 +847,8 @@ namespace UKControllerPluginTest::Releases {
         auto release = releaseCollection->FindById(1);
         EXPECT_EQ(1, release->Id());
         EXPECT_EQ("BAW123", release->Callsign());
-        EXPECT_EQ(2, release->RequestingController());
-        EXPECT_EQ(3, release->TargetController());
+        EXPECT_EQ(2, release->RequestingControllerId());
+        EXPECT_EQ(3, release->TargetControllerId());
         EXPECT_EQ(ParseTimeString("2021-05-12 19:55:00"), release->RequestExpiryTime());
     }
 
@@ -1102,8 +1102,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemovePendingReleases)
     {
-        std::shared_ptr<DepartureReleaseRequest> relevantRelease =
-            std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() + std::chrono::minutes(5));
+        std::shared_ptr<DepartureReleaseRequest> relevantRelease = std::make_shared<DepartureReleaseRequest>(
+            4, "BAW999", position1, position2, TimeNow() + std::chrono::minutes(5));
         releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
         EXPECT_EQ(relevantRelease, releaseCollection->FindById(4));
@@ -1111,8 +1111,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItRemovesPendingReleasesThatHaveExpired)
     {
-        std::shared_ptr<DepartureReleaseRequest> relevantRelease =
-            std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(5));
+        std::shared_ptr<DepartureReleaseRequest> relevantRelease = std::make_shared<DepartureReleaseRequest>(
+            4, "BAW999", position1, position2, TimeNow() - std::chrono::seconds(5));
         releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
         EXPECT_EQ(nullptr, releaseCollection->FindById(4));
@@ -1120,8 +1120,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemoveRecentlyExpiredApprovals)
     {
-        std::shared_ptr<DepartureReleaseRequest> relevantRelease =
-            std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(1));
+        std::shared_ptr<DepartureReleaseRequest> relevantRelease = std::make_shared<DepartureReleaseRequest>(
+            4, "BAW999", position1, position2, TimeNow() - std::chrono::seconds(1));
         relevantRelease->Approve(std::chrono::system_clock::now(), TimeNow() - std::chrono::seconds(80), "remarks");
         releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
@@ -1130,8 +1130,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItExpiresRemovesThatHaveApprovalExpired)
     {
-        std::shared_ptr<DepartureReleaseRequest> relevantRelease =
-            std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(1));
+        std::shared_ptr<DepartureReleaseRequest> relevantRelease = std::make_shared<DepartureReleaseRequest>(
+            4, "BAW999", position1, position2, TimeNow() - std::chrono::seconds(1));
         relevantRelease->Approve(std::chrono::system_clock::now(), TimeNow() - std::chrono::seconds(91), "remarks");
         releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
@@ -1140,8 +1140,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesntRemoveRecentlyRejectedReleases)
     {
-        std::shared_ptr<DepartureReleaseRequest> relevantRelease =
-            std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() - std::chrono::seconds(1));
+        std::shared_ptr<DepartureReleaseRequest> relevantRelease = std::make_shared<DepartureReleaseRequest>(
+            4, "BAW999", position1, position2, TimeNow() - std::chrono::seconds(1));
         relevantRelease->Reject("remarks");
         releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
@@ -1150,8 +1150,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItExpiresReleasesThatHaveRejectionExpired)
     {
-        std::shared_ptr<DepartureReleaseRequest> relevantRelease =
-            std::make_shared<DepartureReleaseRequest>(4, "BAW999", 5, 6, TimeNow() + std::chrono::seconds(5));
+        std::shared_ptr<DepartureReleaseRequest> relevantRelease = std::make_shared<DepartureReleaseRequest>(
+            4, "BAW999", position1, position2, TimeNow() + std::chrono::seconds(5));
         relevantRelease->Approve(std::chrono::system_clock::now(), TimeNow() - std::chrono::seconds(91), "remarks");
         releaseCollection->Add(relevantRelease);
         handler.TimedEventTrigger();
@@ -1452,8 +1452,8 @@ namespace UKControllerPluginTest::Releases {
         EXPECT_NE(nullptr, release);
         EXPECT_EQ(22, release->Id());
         EXPECT_EQ("BAW123", release->Callsign());
-        EXPECT_EQ(2, release->RequestingController());
-        EXPECT_EQ(4, release->TargetController());
+        EXPECT_EQ(2, release->RequestingControllerId());
+        EXPECT_EQ(4, release->TargetControllerId());
         EXPECT_EQ(UKControllerPlugin::Time::TimeNow() + std::chrono::seconds(300), release->RequestExpiryTime());
     }
 
@@ -1580,7 +1580,7 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsNormalIfNoReleases)
     {
         this->releaseCollection->Add(std::make_shared<DepartureReleaseRequest>(
-            1, "BAW456", 3, 2, std::chrono::system_clock::now() + std::chrono::minutes(5)));
+            1, "BAW456", position3, position2, std::chrono::system_clock::now() + std::chrono::minutes(5)));
         UKControllerPlugin::Tag::TagData data = this->GetTagData(124);
         this->handler.SetTagItemData(data);
         EXPECT_EQ("", data.GetItemString());
@@ -1589,8 +1589,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsPendingIfReleaseOutstanding)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
 
         this->releaseCollection->Add(request);
@@ -1604,8 +1604,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsApprovedIfAllRequestsApproved)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
 
@@ -1620,8 +1620,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorPrefersApprovedOverAcknowledged)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request2->Acknowledge();
         request->Acknowledge();
@@ -1638,8 +1638,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsPendingTimeIfWaitingForReleaseTime)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Approve(TimeNow() + std::chrono::seconds(5), TimeNow() + std::chrono::seconds(25), "remarks");
 
@@ -1654,8 +1654,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsExpiredIfAReleaseHasExpired)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Approve(TimeNow() - std::chrono::seconds(35), TimeNow() - std::chrono::seconds(25), "remarks");
 
@@ -1670,8 +1670,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorDisplaysAcknowledgedIfAllAcknowledged)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Acknowledge();
         request->Acknowledge();
 
@@ -1686,8 +1686,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsExpiredIfAReleaseRequestHasExpired)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() - std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() - std::chrono::minutes(5));
         request->Approve(TimeNow() + std::chrono::seconds(15), TimeNow() + std::chrono::seconds(25), "remarks");
 
         this->releaseCollection->Add(request);
@@ -1701,8 +1701,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusIndicatorReturnsRejectedIfAReleaseHasBeenRejected)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         request->Reject("remarks");
 
@@ -1757,8 +1757,8 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(90), "remarks");
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), TimeNow() + std::chrono::seconds(25), "remarks");
         this->releaseCollection->Add(request);
         this->releaseCollection->Add(request2);
@@ -1772,8 +1772,8 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(90), "remarks");
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), "remarks");
         this->releaseCollection->Add(request);
         this->releaseCollection->Add(request2);
@@ -1787,8 +1787,8 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), "remarks");
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow(), "remarks");
         this->releaseCollection->Add(request);
         this->releaseCollection->Add(request2);
@@ -1802,8 +1802,8 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow(), TimeNow() + std::chrono::seconds(90), "remarks");
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() + std::chrono::seconds(50), TimeNow() + std::chrono::seconds(90), "remarks");
 
         this->releaseCollection->Add(request);
@@ -1818,8 +1818,8 @@ namespace UKControllerPluginTest::Releases {
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
         request->Approve(TimeNow() + std::chrono::seconds(65), TimeNow() + std::chrono::seconds(90), "remarks");
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() + std::chrono::seconds(50), TimeNow() + std::chrono::seconds(90), "remarks");
 
         this->releaseCollection->Add(request);
@@ -1833,8 +1833,8 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusCountdownTimerDoesNothingIfOneNotApproved)
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() - std::chrono::seconds(50), TimeNow() + std::chrono::seconds(90), "remarks");
 
         this->releaseCollection->Add(request);
@@ -1848,8 +1848,8 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusCountdownTimerDoesNothingIfApprovalExpired)
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW123", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW123", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() - std::chrono::seconds(50), TimeNow() - std::chrono::seconds(10), "remarks");
 
         this->releaseCollection->Add(request2);
@@ -1862,8 +1862,8 @@ namespace UKControllerPluginTest::Releases {
     TEST_F(DepartureReleaseEventHandlerTest, DepartureReleaseStatusCountdownTimerIgnoresOtherCallsignsReleases)
     {
         UKControllerPlugin::Tag::TagData data = this->GetTagData(125);
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW456", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW456", position2, position3, TimeNow() + std::chrono::minutes(5));
         request2->Approve(TimeNow() - std::chrono::seconds(50), TimeNow() - std::chrono::seconds(10), "remarks");
 
         this->releaseCollection->Add(request2);
@@ -1875,8 +1875,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItTriggersTheRequestView)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW456", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW456", position2, position3, TimeNow() + std::chrono::minutes(5));
 
         this->releaseCollection->Add(request);
         this->releaseCollection->Add(request2);
@@ -1892,8 +1892,8 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ItDoesNothingIfNoReleasesToDisplay)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW456", 2, 3, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW456", position2, position3, TimeNow() + std::chrono::minutes(5));
 
         this->releaseCollection->Add(request2);
 
@@ -1915,22 +1915,22 @@ namespace UKControllerPluginTest::Releases {
         auto request2 = std::make_shared<DepartureReleaseRequest>(
             3,
             "BAW456",
-            3,
-            4,
+            position2,
+            position3,
             TimeNow() + std::chrono::minutes(5)); // Wont show, wrong callsign
 
         auto request3 = std::make_shared<DepartureReleaseRequest>(
             4,
             "BAW123",
-            2,
-            3,
+            position1,
+            position2,
             TimeNow() + std::chrono::minutes(5)); // Wont show, wrong requesting controller
 
         auto request4 = std::make_shared<DepartureReleaseRequest>(
             5,
             "BAW123",
-            3,
-            4,
+            position2,
+            position3,
             TimeNow() + std::chrono::minutes(5)); // Will show
 
         this->releaseCollection->Add(request4);
@@ -1983,8 +1983,8 @@ namespace UKControllerPluginTest::Releases {
 
         ON_CALL(this->mockPlugin, GetSelectedFlightplan).WillByDefault(Return(this->pluginReturnedFlightplan));
 
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(2, "BAW456", 3, 2, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            2, "BAW456", position2, position1, TimeNow() + std::chrono::minutes(5));
 
         this->releaseCollection->Add(request2);
         this->activeCallsigns.AddUserCallsign(*this->controller2Callsign);
@@ -2108,11 +2108,11 @@ namespace UKControllerPluginTest::Releases {
 
     TEST_F(DepartureReleaseEventHandlerTest, ReleasesRequiringUserReturnsReleasesInOrder)
     {
-        auto request2 =
-            std::make_shared<DepartureReleaseRequest>(3, "BAW456", 3, 2, TimeNow() + std::chrono::minutes(5));
+        auto request2 = std::make_shared<DepartureReleaseRequest>(
+            3, "BAW456", position2, position1, TimeNow() + std::chrono::minutes(5));
 
-        auto request3 =
-            std::make_shared<DepartureReleaseRequest>(5, "BAW789", 3, 2, TimeNow() + std::chrono::minutes(5));
+        auto request3 = std::make_shared<DepartureReleaseRequest>(
+            5, "BAW789", position2, position1, TimeNow() + std::chrono::minutes(5));
 
         this->activeCallsigns.AddUserCallsign(*this->controller1Callsign);
         this->releaseCollection->Add(request3);

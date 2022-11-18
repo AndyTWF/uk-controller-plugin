@@ -1,6 +1,8 @@
+#include "controller/ControllerPosition.h"
 #include "releases/DepartureReleaseRequest.h"
 #include "releases/DepartureReleaseRequestEventHandlerCollection.h"
 
+using UKControllerPlugin::Controller::ControllerPosition;
 using UKControllerPlugin::Releases::DepartureReleaseRequest;
 using UKControllerPlugin::Releases::DepartureReleaseRequestEventHandlerCollection;
 
@@ -8,6 +10,12 @@ namespace UKControllerPluginTest::Releases {
     class DepartureReleaseRequestEventHandlerCollectionTest : public testing::Test
     {
         public:
+        DepartureReleaseRequestEventHandlerCollectionTest()
+        {
+            controller = std::make_shared<ControllerPosition>(
+                2, "EGFF_APP", 125.850, std::vector<std::string>{"EGGD", "EGFF"}, true, true);
+        }
+        std::shared_ptr<ControllerPosition> controller;
         DepartureReleaseRequestEventHandlerCollection collection;
     };
 
@@ -45,7 +53,7 @@ namespace UKControllerPluginTest::Releases {
         collection.AddHandler(handler1);
         collection.AddHandler(handler2);
 
-        const DepartureReleaseRequest release(1, "BAW123", 1, 2, std::chrono::system_clock::now());
+        const DepartureReleaseRequest release(1, "BAW123", controller, controller, std::chrono::system_clock::now());
 
         EXPECT_CALL(*handler1, NewRelease(testing::Ref(release))).Times(1);
 
@@ -61,7 +69,7 @@ namespace UKControllerPluginTest::Releases {
         collection.AddHandler(handler1);
         collection.AddHandler(handler2);
 
-        const DepartureReleaseRequest release(1, "BAW123", 1, 2, std::chrono::system_clock::now());
+        const DepartureReleaseRequest release(1, "BAW123", controller, controller, std::chrono::system_clock::now());
 
         EXPECT_CALL(*handler1, ReleaseCancelled(testing::Ref(release))).Times(1);
 
@@ -77,7 +85,7 @@ namespace UKControllerPluginTest::Releases {
         collection.AddHandler(handler1);
         collection.AddHandler(handler2);
 
-        const DepartureReleaseRequest release(1, "BAW123", 1, 2, std::chrono::system_clock::now());
+        const DepartureReleaseRequest release(1, "BAW123", controller, controller, std::chrono::system_clock::now());
 
         EXPECT_CALL(*handler1, ReleaseAcknowledged(testing::Ref(release))).Times(1);
 
@@ -93,7 +101,7 @@ namespace UKControllerPluginTest::Releases {
         collection.AddHandler(handler1);
         collection.AddHandler(handler2);
 
-        const DepartureReleaseRequest release(1, "BAW123", 1, 2, std::chrono::system_clock::now());
+        const DepartureReleaseRequest release(1, "BAW123", controller, controller, std::chrono::system_clock::now());
 
         EXPECT_CALL(*handler1, ReleaseTimeout(testing::Ref(release))).Times(1);
 

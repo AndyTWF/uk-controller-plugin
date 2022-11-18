@@ -39,13 +39,15 @@ namespace UKControllerPluginTest::Departure {
                                                                                           104),
               dialogManager(dialogProvider)
         {
-            // Add positions and releases
-            auto request = std::make_shared<UKControllerPlugin::Releases::DepartureReleaseRequest>(
-                1, "BAW123", 3, 2, std::chrono::system_clock::now() + std::chrono::minutes(5));
-            releaseRequests->Add(request);
+            // Add controllers
             auto position = std::make_shared<UKControllerPlugin::Controller::ControllerPosition>(
                 2, "EGFF_APP", 125.850, std::vector<std::string>{"EGGD", "EGFF"}, true, true);
             controllers.AddPosition(position);
+
+            // Add positions and releases
+            auto request = std::make_shared<UKControllerPlugin::Releases::DepartureReleaseRequest>(
+                1, "BAW123", position, position, std::chrono::system_clock::now() + std::chrono::minutes(5));
+            releaseRequests->Add(request);
             auto controllerCallsign =
                 std::make_shared<UKControllerPlugin::Controller::ActiveCallsign>("EGFF_APP", "Test 1", *position, true);
             this->activeCallsigns.AddUserCallsign(*controllerCallsign);

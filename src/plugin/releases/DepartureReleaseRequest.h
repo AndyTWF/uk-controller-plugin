@@ -1,5 +1,9 @@
 #pragma once
 
+namespace UKControllerPlugin::Controller {
+    class ControllerPosition;
+} // namespace UKControllerPlugin::Controller
+
 namespace UKControllerPlugin::Releases {
 
     class DepartureReleaseRequest
@@ -8,8 +12,8 @@ namespace UKControllerPlugin::Releases {
         DepartureReleaseRequest(
             int id,
             std::string callsign,
-            int requestingController,
-            int targetController,
+            const std::shared_ptr<Controller::ControllerPosition>& requestingController,
+            const std::shared_ptr<Controller::ControllerPosition>& targetController,
             std::chrono::system_clock::time_point requestExpiresAt);
 
         void Acknowledge();
@@ -21,25 +25,27 @@ namespace UKControllerPlugin::Releases {
 
         void Approve(std::chrono::system_clock::time_point releasedAtTime, std::string remarks);
 
-        int Id() const;
-        bool RequiresDecision() const;
-        std::string Callsign() const;
-        int RequestingController() const;
-        int TargetController() const;
-        bool Acknowledged() const;
-        bool Rejected() const;
-        bool Approved() const;
-        bool RequestExpired() const;
-        bool ApprovalExpired() const;
-        bool AwaitingReleasedTime() const;
-        bool ApprovedWithNoExpiry() const;
+        [[nodiscard]] auto Id() const -> int;
+        [[nodiscard]] auto RequiresDecision() const -> bool;
+        [[nodiscard]] auto Callsign() const -> const std::string&;
+        [[nodiscard]] auto RequestingController() const -> std::shared_ptr<Controller::ControllerPosition>;
+        [[nodiscard]] auto RequestingControllerId() const -> int;
+        [[nodiscard]] auto TargetController() const -> std::shared_ptr<Controller::ControllerPosition>;
+        [[nodiscard]] auto TargetControllerId() const -> int;
+        [[nodiscard]] auto Acknowledged() const -> bool;
+        [[nodiscard]] auto Rejected() const -> bool;
+        [[nodiscard]] auto Approved() const -> bool;
+        [[nodiscard]] auto RequestExpired() const -> bool;
+        [[nodiscard]] auto ApprovalExpired() const -> bool;
+        [[nodiscard]] auto AwaitingReleasedTime() const -> bool;
+        [[nodiscard]] auto ApprovedWithNoExpiry() const -> bool;
         [[nodiscard]] auto Remarks() const -> const std::string&;
-        std::chrono::system_clock::time_point RequestExpiryTime() const;
-        std::chrono::system_clock::time_point ReleaseExpiryTime() const;
-        std::chrono::system_clock::time_point ReleasedAtTime() const;
-        std::chrono::system_clock::time_point RejectedAtTime() const;
-        std::chrono::system_clock::time_point AcknowledgedAtTime() const;
-        auto CreatedAt() const -> std::chrono::system_clock::time_point;
+        [[nodiscard]] auto RequestExpiryTime() const -> const std::chrono::system_clock::time_point&;
+        [[nodiscard]] auto ReleaseExpiryTime() const -> const std::chrono::system_clock::time_point&;
+        [[nodiscard]] auto ReleasedAtTime() const -> const std::chrono::system_clock::time_point&;
+        [[nodiscard]] auto RejectedAtTime() const -> const std::chrono::system_clock::time_point&;
+        [[nodiscard]] auto AcknowledgedAtTime() const -> const std::chrono::system_clock::time_point&;
+        [[nodiscard]] auto CreatedAt() const -> const std::chrono::system_clock::time_point&;
 
         private:
         static inline const std::chrono::system_clock::time_point noTime =
@@ -55,10 +61,10 @@ namespace UKControllerPlugin::Releases {
         std::string callsign;
 
         // Who's requesting the release
-        int requestingController;
+        std::shared_ptr<Controller::ControllerPosition> requestingController;
 
         // Who's the target of the release request
-        int targetController;
+        std::shared_ptr<Controller::ControllerPosition> targetController;
 
         // When the the request expires
         std::chrono::system_clock::time_point requestExpiresAt;

@@ -18,9 +18,12 @@ namespace UKControllerPluginTest::Releases {
                 1, "EGKK_TWR", 124.225, std::vector<std::string>{"EGKK"}, true, false);
             receivingPosition = std::make_shared<ControllerPosition>(
                 2, "EGKK_F_APP", 124.225, std::vector<std::string>{"EGKK"}, true, false);
-            request1 = std::make_shared<DepartureReleaseRequest>(1, "BAW123", 1, 2, TimeNow());
-            request2 = std::make_shared<DepartureReleaseRequest>(5, "BAW456", 1, 2, TimeNow());
-            request3 = std::make_shared<DepartureReleaseRequest>(3, "BAW456", 1, 2, TimeNow());
+            request1 =
+                std::make_shared<DepartureReleaseRequest>(1, "BAW123", sendingPosition, receivingPosition, TimeNow());
+            request2 =
+                std::make_shared<DepartureReleaseRequest>(5, "BAW456", sendingPosition, receivingPosition, TimeNow());
+            request3 =
+                std::make_shared<DepartureReleaseRequest>(3, "BAW456", sendingPosition, receivingPosition, TimeNow());
         }
 
         std::shared_ptr<ControllerPosition> sendingPosition;

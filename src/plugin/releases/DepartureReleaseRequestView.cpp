@@ -73,7 +73,7 @@ namespace UKControllerPlugin::Releases {
         for (const auto& release : releasesToDisplay) {
 
             const std::wstring controller = HelperFunctions::ConvertToWideString(
-                this->controllers.FetchPositionById(release->TargetController())->GetCallsign());
+                this->controllers.FetchPositionById(release->TargetControllerId())->GetCallsign());
 
             const auto controllerColour = GetControllerColour(release);
             auto brushForRow = Gdiplus::SolidBrush(

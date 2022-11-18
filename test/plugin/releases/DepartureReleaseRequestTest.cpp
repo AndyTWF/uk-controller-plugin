@@ -1,7 +1,9 @@
+#include "controller/ControllerPosition.h"
 #include "releases/DepartureReleaseRequest.h"
 #include "time/SystemClock.h"
 
 using testing::Test;
+using UKControllerPlugin::Controller::ControllerPosition;
 using UKControllerPlugin::Releases::DepartureReleaseRequest;
 using UKControllerPlugin::Time::SetTestNow;
 using UKControllerPlugin::Time::TimeNow;
@@ -14,9 +16,16 @@ namespace UKControllerPluginTes::Releases {
         DepartureReleaseRequestTest() : requestExpiresAt(std::chrono::system_clock::now() + std::chrono::minutes(3))
         {
             SetTestNow(std::chrono::system_clock::now());
-            request = std::make_unique<DepartureReleaseRequest>(1, "BAW123", 2, 3, requestExpiresAt);
+            requestingController = std::make_shared<ControllerPosition>(
+                2, "EGKK_TWR", 124.225, std::vector<std::string>{"EGKK"}, true, false);
+            targetController = std::make_shared<ControllerPosition>(
+                3, "LON_S_CTR", 129.425, std::vector<std::string>{"EGKK"}, true, false);
+            request = std::make_unique<DepartureReleaseRequest>(
+                1, "BAW123", requestingController, targetController, requestExpiresAt);
         }
 
+        std::shared_ptr<ControllerPosition> requestingController;
+        std::shared_ptr<ControllerPosition> targetController;
         std::chrono::system_clock::time_point requestExpiresAt;
         std::unique_ptr<DepartureReleaseRequest> request;
     };
@@ -33,12 +42,22 @@ namespace UKControllerPluginTes::Releases {
 
     TEST_F(DepartureReleaseRequestTest, ItHasARequestingController)
     {
-        EXPECT_EQ(2, request->RequestingController());
+        EXPECT_EQ(requestingController, request->RequestingController());
+    }
+
+    TEST_F(DepartureReleaseRequestTest, ItHasARequestingControllerId)
+    {
+        EXPECT_EQ(2, request->RequestingControllerId());
     }
 
     TEST_F(DepartureReleaseRequestTest, ItHasATargetController)
     {
-        EXPECT_EQ(3, request->TargetController());
+        EXPECT_EQ(targetController, request->TargetController());
+    }
+
+    TEST_F(DepartureReleaseRequestTest, ItHasATargetControllerId)
+    {
+        EXPECT_EQ(3, request->TargetControllerId());
     }
 
     TEST_F(DepartureReleaseRequestTest, ItHasARequestExpiryTime)

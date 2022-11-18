@@ -201,7 +201,7 @@ namespace UKControllerPlugin::Bootstrap {
         std::shared_ptr<UKControllerPlugin::Datablock::DisplayTime> timeFormatting;
         std::shared_ptr<UKControllerPlugin::Prenote::PrenoteMessageCollection> prenotes;
         std::unique_ptr<UKControllerPlugin::Prenote::PrenoteMessageEventHandlerCollection> prenoteMessageHandlers;
-        std::unique_ptr<UKControllerPlugin::Releases::DepartureReleaseRequestEventHandlerCollection>
+        std::shared_ptr<UKControllerPlugin::Releases::DepartureReleaseRequestEventHandlerCollection>
             releaseRequestHandlers;
         std::shared_ptr<UKControllerPlugin::Dependency::DependencyLoaderInterface> dependencyLoader;
 

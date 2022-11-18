@@ -496,7 +496,7 @@ set(test__releases
     "releases/EnrouteReleaseTypesSerializerTest.cpp"
     "releases/ReleaseModuleTest.cpp"
     releases/ReleaseApprovalRemarksUserMessageTest.cpp
-    releases/ReleaseRejectionRemarksUserMessageTest.cpp releases/DepartureReleaseRequestCollectionTest.cpp releases/DepartureReleaseRequestEventHandlerCollectionTest.cpp)
+    releases/ReleaseRejectionRemarksUserMessageTest.cpp releases/DepartureReleaseRequestCollectionTest.cpp releases/DepartureReleaseRequestEventHandlerCollectionTest.cpp releases/NewDepartureReleasePushEventHandlerTest.cpp)
 source_group("test\\releases" FILES ${test__releases})
 
 set(test__runway

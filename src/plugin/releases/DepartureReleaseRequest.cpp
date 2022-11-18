@@ -1,4 +1,5 @@
 #include "DepartureReleaseRequest.h"
+#include "controller/ControllerPosition.h"
 #include "time/SystemClock.h"
 
 namespace UKControllerPlugin::Releases {
@@ -6,12 +7,14 @@ namespace UKControllerPlugin::Releases {
     DepartureReleaseRequest::DepartureReleaseRequest(
         int id,
         std::string callsign,
-        int requestingController,
-        int targetController,
+        const std::shared_ptr<Controller::ControllerPosition>& requestingController,
+        const std::shared_ptr<Controller::ControllerPosition>& targetController,
         std::chrono::system_clock::time_point requestExpiresAt)
         : id(id), callsign(std::move(callsign)), requestingController(requestingController),
           targetController(targetController), requestExpiresAt(requestExpiresAt), createdAt(Time::TimeNow())
     {
+        assert(requestingController && "requesting controller is nullptr");
+        assert(targetController && "target controller is nullptr");
     }
 
     void DepartureReleaseRequest::Acknowledge()
@@ -22,7 +25,7 @@ namespace UKControllerPlugin::Releases {
     void DepartureReleaseRequest::Reject(std::string remarks)
     {
         this->rejectedAtTime = Time::TimeNow();
-        this->remarks = remarks;
+        this->remarks = std::move(remarks);
     }
 
     void DepartureReleaseRequest::Approve(
@@ -32,13 +35,13 @@ namespace UKControllerPlugin::Releases {
     {
         this->releasedAtTime = releasedAtTime;
         this->releaseExpiresAt = releaseExpiresAt;
-        this->remarks = remarks;
+        this->remarks = std::move(remarks);
     }
 
     void DepartureReleaseRequest::Approve(std::chrono::system_clock::time_point releasedAtTime, std::string remarks)
     {
         this->releasedAtTime = releasedAtTime;
-        this->remarks = remarks;
+        this->remarks = std::move(remarks);
     }
 
     auto DepartureReleaseRequest::Id() const -> int
@@ -46,39 +49,49 @@ namespace UKControllerPlugin::Releases {
         return this->id;
     }
 
-    bool DepartureReleaseRequest::RequiresDecision() const
+    auto DepartureReleaseRequest::RequiresDecision() const -> bool
     {
         return !this->Rejected() && !this->RequestExpired() && !this->Approved();
     }
 
-    auto DepartureReleaseRequest::Callsign() const -> std::string
+    auto DepartureReleaseRequest::Callsign() const -> const std::string&
     {
         return this->callsign;
     }
 
-    auto DepartureReleaseRequest::RequestingController() const -> int
+    auto DepartureReleaseRequest::RequestingController() const -> std::shared_ptr<Controller::ControllerPosition>
     {
         return this->requestingController;
     }
 
-    auto DepartureReleaseRequest::TargetController() const -> int
+    auto DepartureReleaseRequest::RequestingControllerId() const -> int
+    {
+        return this->requestingController->GetId();
+    }
+
+    auto DepartureReleaseRequest::TargetController() const -> std::shared_ptr<Controller::ControllerPosition>
     {
         return this->targetController;
     }
 
-    bool DepartureReleaseRequest::Acknowledged() const
+    auto DepartureReleaseRequest::TargetControllerId() const -> int
     {
-        return this->acknowledgedAtTime != this->noTime;
+        return this->targetController->GetId();
+    }
+
+    auto DepartureReleaseRequest::Acknowledged() const -> bool
+    {
+        return this->acknowledgedAtTime != DepartureReleaseRequest::noTime;
     }
 
     auto DepartureReleaseRequest::Rejected() const -> bool
     {
-        return this->rejectedAtTime != this->noTime;
+        return this->rejectedAtTime != DepartureReleaseRequest::noTime;
     }
 
     auto DepartureReleaseRequest::Approved() const -> bool
     {
-        return this->releasedAtTime != this->noTime;
+        return this->releasedAtTime != DepartureReleaseRequest::noTime;
     }
 
     auto DepartureReleaseRequest::RequestExpired() const -> bool
@@ -98,35 +111,35 @@ namespace UKControllerPlugin::Releases {
 
     auto DepartureReleaseRequest::ApprovedWithNoExpiry() const -> bool
     {
-        return this->Approved() && this->releaseExpiresAt == this->noTimeMax;
+        return this->Approved() && this->releaseExpiresAt == DepartureReleaseRequest::noTimeMax;
     }
 
-    auto DepartureReleaseRequest::RequestExpiryTime() const -> std::chrono::system_clock::time_point
+    auto DepartureReleaseRequest::RequestExpiryTime() const -> const std::chrono::system_clock::time_point&
     {
         return this->requestExpiresAt;
     }
 
-    auto DepartureReleaseRequest::ReleaseExpiryTime() const -> std::chrono::system_clock::time_point
+    auto DepartureReleaseRequest::ReleaseExpiryTime() const -> const std::chrono::system_clock::time_point&
     {
         return this->releaseExpiresAt;
     }
 
-    auto DepartureReleaseRequest::ReleasedAtTime() const -> std::chrono::system_clock::time_point
+    auto DepartureReleaseRequest::ReleasedAtTime() const -> const std::chrono::system_clock::time_point&
     {
         return this->releasedAtTime;
     }
 
-    auto DepartureReleaseRequest::RejectedAtTime() const -> std::chrono::system_clock::time_point
+    auto DepartureReleaseRequest::RejectedAtTime() const -> const std::chrono::system_clock::time_point&
     {
         return this->rejectedAtTime;
     }
 
-    auto DepartureReleaseRequest::AcknowledgedAtTime() const -> std::chrono::system_clock::time_point
+    auto DepartureReleaseRequest::AcknowledgedAtTime() const -> const std::chrono::system_clock::time_point&
     {
         return this->acknowledgedAtTime;
     }
 
-    auto DepartureReleaseRequest::CreatedAt() const -> std::chrono::system_clock::time_point
+    auto DepartureReleaseRequest::CreatedAt() const -> const std::chrono::system_clock::time_point&
     {
         return this->createdAt;
     }

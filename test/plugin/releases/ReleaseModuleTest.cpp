@@ -140,6 +140,12 @@ namespace UKControllerPluginTest::Releases {
         BootstrapPlugin(this->container, this->plugin, this->dependencyLoader);
         EXPECT_EQ(1, this->container.pushEventProcessors->CountProcessorsForChannel("private-departure-releases"));
     }
+    
+    TEST_F(ReleaseModuleTest, ItRegistersForNewRequestPushEvents)
+    {
+        BootstrapPlugin(this->container, this->plugin, this->dependencyLoader);
+        EXPECT_EQ(1, this->container.pushEventProcessors->CountProcessorsForEvent("departure_release.requested"));
+    }
 
     TEST_F(ReleaseModuleTest, ItRegistersTagItemForDepartureReleaseStatusIndicator)
     {

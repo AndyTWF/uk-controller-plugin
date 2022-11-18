@@ -142,7 +142,7 @@ namespace UKControllerPlugin::Releases {
         }
 
         if (!this->activeCallsigns.UserHasCallsign() ||
-            this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId() != release->TargetController()) {
+            this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId() != release->TargetControllerId()) {
             LogError("Cannot approve release, user not authorised to approve");
             return false;
         }
@@ -226,7 +226,7 @@ namespace UKControllerPlugin::Releases {
         auto controllerId = this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId();
 
         releaseRequests->Iterate([controllerId, &releases](const std::shared_ptr<DepartureReleaseRequest>& release) {
-            if (release->TargetController() == controllerId && release->RequiresDecision()) {
+            if (release->TargetControllerId() == controllerId && release->RequiresDecision()) {
                 releases.insert(release);
             }
         });
@@ -252,7 +252,7 @@ namespace UKControllerPlugin::Releases {
         int userControllerId = this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId();
         releaseRequests->Iterate([this, &mousePos, &menuTriggered, &flightplan, &userControllerId](
                                      const std::shared_ptr<DepartureReleaseRequest>& release) {
-            if (release->RequestingController() != userControllerId ||
+            if (release->RequestingControllerId() != userControllerId ||
                 release->Callsign() != flightplan.GetCallsign()) {
                 return;
             }
@@ -272,7 +272,7 @@ namespace UKControllerPlugin::Releases {
 
             // Add an item to the menu
             Plugin::PopupMenuItem menuItem;
-            menuItem.firstValue = this->controllers.FetchPositionById(release->TargetController())->GetCallsign();
+            menuItem.firstValue = this->controllers.FetchPositionById(release->TargetControllerId())->GetCallsign();
             menuItem.secondValue = "";
             menuItem.callbackFunctionId = this->releaseCancellationCallbackId;
             menuItem.checked = EuroScopePlugIn::POPUP_ELEMENT_NO_CHECKBOX;
@@ -298,7 +298,7 @@ namespace UKControllerPlugin::Releases {
             [fp, this, context](const std::shared_ptr<DepartureReleaseRequest>& releaseRequest) -> bool {
                 return fp->GetCallsign() == releaseRequest->Callsign() &&
                        this->controllers.FetchPositionByCallsign(context)->GetId() ==
-                           releaseRequest->TargetController();
+                           releaseRequest->TargetControllerId();
             });
 
         if (release == nullptr) {
@@ -326,7 +326,7 @@ namespace UKControllerPlugin::Releases {
         return releaseRequests->FirstWhere(
             [&callsign, userControllerId](const std::shared_ptr<DepartureReleaseRequest>& release) -> bool {
                 return release->Callsign() == callsign && release->RequiresDecision() &&
-                       userControllerId == release->TargetController();
+                       userControllerId == release->TargetControllerId();
             });
     }
 
@@ -479,7 +479,7 @@ namespace UKControllerPlugin::Releases {
         }
 
         std::string requestingControllerCallsign =
-            this->controllers.FetchPositionById(release->RequestingController())->GetCallsign();
+            this->controllers.FetchPositionById(release->RequestingControllerId())->GetCallsign();
 
         tagData.SetItemString(
             this->activeCallsigns.PositionActive(requestingControllerCallsign)
@@ -493,7 +493,7 @@ namespace UKControllerPlugin::Releases {
     {
         return this->activeCallsigns.UserHasCallsign() &&
                this->activeCallsigns.GetUserCallsign().GetNormalisedPosition().GetId() ==
-                   request->RequestingController();
+                   request->RequestingControllerId();
     }
 
     /**
@@ -513,13 +513,14 @@ namespace UKControllerPlugin::Releases {
         releaseRequests->Add(std::make_shared<DepartureReleaseRequest>(
             releaseRequestId,
             callsign,
-            data.at("requesting_controller").get<int>(),
-            targetController,
+            this->controllers.FetchPositionById(data.at("requesting_controller").get<int>()),
+            this->controllers.FetchPositionById(targetController),
             Time::ParseTimeString(data.at("expires_at").get<std::string>())));
 
         releaseRequests->RemoveWhere(
             [&callsign, &targetController, &releaseRequestId](const DepartureReleaseRequest& releaseRequest) -> bool {
-                return releaseRequest.Callsign() == callsign && releaseRequest.TargetController() == targetController &&
+                return releaseRequest.Callsign() == callsign &&
+                       releaseRequest.TargetControllerId() == targetController &&
                        releaseRequest.Id() != releaseRequestId;
             });
 
@@ -560,7 +561,7 @@ namespace UKControllerPlugin::Releases {
         if (this->UserRequestedRelease(release)) {
             this->windows.PlayWave(MAKEINTRESOURCE(WAVE_DEP_RLS_REJ)); // NOLINT
             if (!data.at("remarks").get<std::string>().empty()) {
-                auto controller = this->controllers.FetchPositionById(release->TargetController())->GetCallsign();
+                auto controller = this->controllers.FetchPositionById(release->TargetControllerId())->GetCallsign();
                 this->messager.SendMessageToUser(ReleaseRejectionRemarksUserMessage(
                     release->Callsign(), controller, data.at("remarks").get<std::string>()));
             }
@@ -593,7 +594,7 @@ namespace UKControllerPlugin::Releases {
         if (this->UserRequestedRelease(release)) {
             this->windows.PlayWave(MAKEINTRESOURCE(WAVE_DEP_RLS_ACCEPT)); // NOLINT
             if (!data.at("remarks").get<std::string>().empty()) {
-                auto controller = this->controllers.FetchPositionById(release->TargetController())->GetCallsign();
+                auto controller = this->controllers.FetchPositionById(release->TargetControllerId())->GetCallsign();
                 this->messager.SendMessageToUser(ReleaseApprovalRemarksUserMessage(
                     release->Callsign(), controller, data.at("remarks").get<std::string>()));
             }
@@ -724,7 +725,7 @@ namespace UKControllerPlugin::Releases {
         // Release has been acknowledged
         this->taskRunner.QueueAsynchronousTask([this, release]() {
             try {
-                this->api.AcknowledgeDepartureReleaseRequest(release->Id(), release->TargetController());
+                this->api.AcknowledgeDepartureReleaseRequest(release->Id(), release->TargetControllerId());
                 release->Acknowledge();
                 LogInfo("Acknowledged departure release id " + std::to_string(release->Id()));
             } catch (Api::ApiException& apiException) {
@@ -770,8 +771,8 @@ namespace UKControllerPlugin::Releases {
                 releaseRequests->Add(std::make_shared<DepartureReleaseRequest>(
                     response.at("id").get<int>(),
                     callsign,
-                    userPositionId,
-                    targetControllerId,
+                    this->controllers.FetchPositionById(userPositionId),
+                    this->controllers.FetchPositionById(targetControllerId),
                     Time::TimeNow() + std::chrono::seconds(RELEASE_EXPIRY_SECONDS)));
                 LogInfo(
                     "Requested departure release id " + std::to_string(response.at("id").get<int>()) + " for " +
@@ -796,7 +797,7 @@ namespace UKControllerPlugin::Releases {
         this->taskRunner.QueueAsynchronousTask([this, release, releasedAt, expiresInSeconds, remarks]() {
             try {
                 this->api.ApproveDepartureReleaseRequest(
-                    release->Id(), release->TargetController(), releasedAt, expiresInSeconds, remarks);
+                    release->Id(), release->TargetControllerId(), releasedAt, expiresInSeconds, remarks);
 
                 if (expiresInSeconds == -1) {
                     release->Approve(releasedAt, remarks);
@@ -819,7 +820,7 @@ namespace UKControllerPlugin::Releases {
 
         this->taskRunner.QueueAsynchronousTask([this, release, remarks]() {
             try {
-                this->api.RejectDepartureReleaseRequest(release->Id(), release->TargetController(), remarks);
+                this->api.RejectDepartureReleaseRequest(release->Id(), release->TargetControllerId(), remarks);
                 release->Reject(remarks);
                 LogInfo("Rejected departure release id " + std::to_string(release->Id()));
             } catch (Api::ApiException& apiException) {
