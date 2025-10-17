@@ -3,9 +3,9 @@ name: Build
 on:
   push:
     branches:
-      - 'main'
-      - 'alpha'
-      - 'beta'
+      - "main"
+      - "alpha"
+      - "beta"
   pull_request:
 
 jobs:
@@ -47,14 +47,14 @@ jobs:
           CURL_DOWNLOAD_URL: "https://github.com/curl/curl/releases/download/curl-7_76_1/curl-7.76.1.zip"
           CURL_VERSION: 7.76.1
         run: |
-            New-Item -Path "C:\\hostedtoolcache\\windows" -Name "libcurl" -ItemType "directory"
-            $WebClient = New-Object System.Net.WebClient
-            $WebClient.DownloadFile(${env:CURL_DOWNLOAD_URL}, "C:\\hostedtoolcache\\windows\\libcurl\\curl.zip")
-            Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl"
-            7z x curl.zip
-            Remove-Item curl.zip
-            Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl\\curl-${env:CURL_VERSION}\\winbuild"
-            nmake /f Makefile.vc mode=static ENABLE_SCHANNEL=yes
+          New-Item -Path "C:\\hostedtoolcache\\windows" -Name "libcurl" -ItemType "directory"
+          $WebClient = New-Object System.Net.WebClient
+          $WebClient.DownloadFile(${env:CURL_DOWNLOAD_URL}, "C:\\hostedtoolcache\\windows\\libcurl\\curl.zip")
+          Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl"
+          7z x curl.zip
+          Remove-Item curl.zip
+          Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl\\curl-${env:CURL_VERSION}\\winbuild"
+          nmake /f Makefile.vc mode=static ENABLE_SCHANNEL=yes
 
       - name: Setup cURL Environment
         env:
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Yarn
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: "16"
 
       - name: Get Yarn Cache Directory
         id: yarn-cache-dir-path
@@ -85,7 +85,7 @@ jobs:
       - name: Load Cached Node Modules
         uses: actions/cache@v4
         with:
-          path: '**/node_modules'
+          path: "**/node_modules"
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
 
       # Install yarn things
@@ -109,6 +109,43 @@ jobs:
       - name: Run Ninja Build
         working-directory: build
         run: ninja
+
+      - name: Check Test Dependencies
+        working-directory: build
+        run: |
+          Write-Host "=== Checking DLL dependencies and availability ==="
+
+          # List DLLs in bin directory
+          Write-Host "`nDLLs in bin directory:"
+          Get-ChildItem bin\*.dll | ForEach-Object { Write-Host "  $($_.Name)" }
+
+          # Check UKControllerPluginCoreTest.exe dependencies
+          Write-Host "`n=== UKControllerPluginCoreTest.exe dependencies ==="
+          dumpbin /dependents bin\UKControllerPluginCoreTest.exe
+
+          # Check UKControllerPluginCore.dll dependencies
+          Write-Host "`n=== UKControllerPluginCore.dll dependencies ==="
+          dumpbin /dependents bin\UKControllerPluginCore.dll
+
+          # Check UKControllerPluginUtils.dll dependencies
+          Write-Host "`n=== UKControllerPluginUtils.dll dependencies ==="
+          dumpbin /dependents bin\UKControllerPluginUtils.dll
+
+          # Use dependency walker alternative - check with where.exe
+          Write-Host "`n=== Checking system DLL locations ==="
+          @('DWMAPI.dll', 'gdiplus.dll', 'comctl32.dll', 'MSVCP140.dll', 'VCRUNTIME140.dll', 'MSVCP140_ATOMIC_WAIT.dll') | ForEach-Object {
+            $dll = $_
+            try {
+              $location = where.exe $dll 2>$null
+              if ($location) {
+                Write-Host "  $dll : FOUND"
+              } else {
+                Write-Host "  $dll : NOT FOUND in PATH"
+              }
+            } catch {
+              Write-Host "  $dll : NOT FOUND"
+            }
+          }
 
       - name: Run Tests
         working-directory: build
@@ -196,7 +233,7 @@ jobs:
       - name: Setup Yarn
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: "16"
 
       - name: Get Yarn Cache Directory
         id: yarn-cache-dir-path
@@ -214,7 +251,7 @@ jobs:
       - name: Load Cached Node Modules
         uses: actions/cache@v4
         with:
-          path: '**/node_modules'
+          path: "**/node_modules"
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
 
       # Install yarn things
