@@ -127,8 +127,13 @@ jobs:
         run: |
           # Use 32-bit procdump for 32-bit test executable
           # -e = dump on unhandled exception, -ma = full dump, -x = write dumps to folder
-          ..\procdump\procdump.exe -accepteula -e -ma -x "..\dumps" -- `
-            ".\bin\UKControllerPluginCoreTest.exe" --gtest_list_tests
+          $testExe = Resolve-Path ".\bin\UKControllerPluginCoreTest.exe"
+          $dumpDir = Resolve-Path "..\dumps"
+
+          Write-Host "Running: $testExe"
+          Write-Host "Dump directory: $dumpDir"
+
+          & ..\procdump\procdump.exe -accepteula -e -ma -x $dumpDir $testExe --gtest_list_tests
           $exitCode = $LASTEXITCODE
           Write-Host "Test exit code: $exitCode (0x$($exitCode.ToString('X8')))"
           "ExitCode=$exitCode" | Out-File ..\logs\exit-code.txt
