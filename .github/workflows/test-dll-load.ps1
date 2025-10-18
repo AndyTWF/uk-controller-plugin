@@ -6,6 +6,11 @@ param(
 Write-Host "=== DLL Load Test Script ===" -ForegroundColor Cyan
 Write-Host "Testing DLL loading from: $BinDirectory"
 
+# Check if PowerShell is running as 32-bit or 64-bit
+$is64Bit = [Environment]::Is64BitProcess
+Write-Host "PowerShell process architecture: $( if ($is64Bit) { '64-bit' } else { '32-bit' } )" -ForegroundColor Cyan
+Write-Host "OS architecture: $( if ([Environment]::Is64BitOperatingSystem) { '64-bit' } else { '32-bit' } )" -ForegroundColor Cyan
+
 # Define the P/Invoke signatures
 Add-Type @"
 using System;

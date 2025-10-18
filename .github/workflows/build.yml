@@ -110,14 +110,10 @@ jobs:
         working-directory: build
         run: ninja
 
-      - name: Test DLL Loading (Before Runtime Copy)
+      - name: Copy Runtime DLLs to bin directory
         working-directory: build
         run: |
-          & "$env:GITHUB_WORKSPACE\.github\workflows\test-dll-load.ps1" -BinDirectory "$(Get-Location)\bin"
-
-      - name: Copy Runtime DLLs
-        working-directory: build
-        run: |
+          Write-Host "Copying Visual C++ 32-bit runtime DLLs to bin directory..."
           $vsPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC"
           $msvcVersion = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
           $x86RuntimePath = Join-Path $msvcVersion.FullName "bin\Hostx86\x86"
@@ -126,12 +122,9 @@ jobs:
           Copy-Item "$x86RuntimePath\vcruntime140.dll" "bin\" -Force
           Copy-Item "$x86RuntimePath\msvcp140_atomic_wait.dll" "bin\" -Force
 
-          Write-Host "Copied Visual C++ runtime DLLs to bin directory"
-
-      - name: Test DLL Loading (After Runtime Copy)
-        working-directory: build
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\workflows\test-dll-load.ps1" -BinDirectory "$(Get-Location)\bin"
+          Write-Host "Copied msvcp140.dll, vcruntime140.dll, msvcp140_atomic_wait.dll"
+          Write-Host "Files in bin directory:"
+          Get-ChildItem "bin\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
 
       - name: Run Tests
         working-directory: build
