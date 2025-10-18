@@ -110,139 +110,32 @@ jobs:
         working-directory: build
         run: ninja
 
-      - name: Check Test Dependencies
+      - name: Test DLL Loading (Before Runtime Copy)
         working-directory: build
         run: |
-          Write-Host "=== Checking DLL dependencies and availability ==="
+          & "$env:GITHUB_WORKSPACE\.github\workflows\test-dll-load.ps1" -BinDirectory "$(Get-Location)\bin"
 
-          # List files in bin directory
-          Write-Host "`nFiles in bin directory:"
-          Get-ChildItem bin\* | ForEach-Object { Write-Host "  $($_.Name)" }
-
-          # Check if EuroScopePlugInDll.dll exists in bin
-          if (Test-Path "bin\EuroScopePlugInDll.dll") {
-            Write-Host "`nEuroScopePlugInDll.dll : EXISTS in bin directory" -ForegroundColor Green
-          } else {
-            Write-Host "`nEuroScopePlugInDll.dll : MISSING from bin directory" -ForegroundColor Red
-          }
-
-          # Check UKControllerPluginCoreTest.exe dependencies
-          Write-Host "`n=== UKControllerPluginCoreTest.exe dependencies ==="
-          dumpbin /dependents bin\UKControllerPluginCoreTest.exe
-
-          # Parse and check all dependencies from the test executable
-          Write-Host "`n=== Checking if all test dependencies are available (32-bit) ==="
-          $testDeps = dumpbin /dependents bin\UKControllerPluginCoreTest.exe | Select-String "\.dll" | ForEach-Object { $_.Line.Trim() }
-
-          foreach ($dll in $testDeps) {
-            if ($dll -match "^[\w\-]+\.dll$") {
-              # First check in bin directory
-              if (Test-Path "bin\$dll") {
-                Write-Host "  $dll : FOUND in bin directory" -ForegroundColor Green
-              } else {
-                # Check in system PATH and verify architectures
-                $locations = where.exe $dll 2>&1
-                if ($LASTEXITCODE -eq 0) {
-                  $allLocations = ($locations -split "`n") | Where-Object { $_ -match "\.dll$" }
-                  $found32bit = $false
-                  $found64bit = $false
-
-                  foreach ($location in $allLocations) {
-                    # Check if it's 32-bit using dumpbin
-                    $dumpOutput = dumpbin /headers $location 2>&1 | Select-String "machine"
-                    if ($dumpOutput -match "\(x86\)") {
-                      if (-not $found32bit) {
-                        Write-Host "  $dll : FOUND 32-bit at $location" -ForegroundColor Green
-                        $found32bit = $true
-                      }
-                    } elseif ($dumpOutput -match "x64") {
-                      if (-not $found64bit) {
-                        Write-Host "  $dll : FOUND 64-bit at $location" -ForegroundColor Yellow
-                        $found64bit = $true
-                      }
-                    }
-                  }
-
-                  if (-not $found32bit -and -not $found64bit) {
-                    Write-Host "  $dll : FOUND but architecture unknown at $($allLocations[0])"
-                  } elseif (-not $found32bit) {
-                    Write-Host "  $dll : WARNING - Only 64-bit version found, 32-bit needed!" -ForegroundColor Red
-                  }
-                } else {
-                  Write-Host "  $dll : NOT FOUND" -ForegroundColor Red
-                }
-              }
-            }
-          }
-
-          Write-Host "`n=== Checking Visual Studio x86 bin directory ==="
+      - name: Copy Runtime DLLs
+        working-directory: build
+        run: |
           $vsPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC"
-          if (Test-Path $vsPath) {
-            $msvcVersions = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
-            $x86BinPath = Join-Path $msvcVersions.FullName "bin\Hostx86\x86"
-            Write-Host "VS x86 bin path: $x86BinPath"
-            if (Test-Path $x86BinPath) {
-              Write-Host "Contents:"
-              Get-ChildItem "$x86BinPath\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
-            }
-          }
+          $msvcVersion = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
+          $x86RuntimePath = Join-Path $msvcVersion.FullName "bin\Hostx86\x86"
 
-          Write-Host "`n=== Testing DLL loading manually ==="
-          # Try to load each DLL that the test depends on
-          Add-Type @"
-            using System;
-            using System.Runtime.InteropServices;
-            public class DllLoader {
-                [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-                public static extern IntPtr LoadLibrary(string lpFileName);
+          Copy-Item "$x86RuntimePath\msvcp140.dll" "bin\" -Force
+          Copy-Item "$x86RuntimePath\vcruntime140.dll" "bin\" -Force
+          Copy-Item "$x86RuntimePath\msvcp140_atomic_wait.dll" "bin\" -Force
 
-                [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-                public static extern bool FreeLibrary(IntPtr hModule);
-            }
-"@
+          Write-Host "Copied Visual C++ runtime DLLs to bin directory"
 
-          # Test loading the main DLLs in order
-          $testDlls = @(
-            "bin\EuroScopePlugInDll.dll",
-            "bin\UKControllerPluginCore.dll"
-          )
-
-          foreach ($dllPath in $testDlls) {
-            $fullPath = Resolve-Path $dllPath -ErrorAction SilentlyContinue
-            if ($fullPath) {
-              Write-Host "Testing load: $fullPath"
-              $handle = [DllLoader]::LoadLibrary($fullPath)
-              if ($handle -eq [IntPtr]::Zero) {
-                $error = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                Write-Host "  FAILED to load: Error code $error (0x$($error.ToString('X')))" -ForegroundColor Red
-
-                # Common error codes
-                if ($error -eq 126) { Write-Host "    Error 126: The specified module could not be found (a dependency is missing)" }
-                if ($error -eq 127) { Write-Host "    Error 127: The specified procedure could not be found" }
-              } else {
-                Write-Host "  SUCCESS: Loaded successfully" -ForegroundColor Green
-                [DllLoader]::FreeLibrary($handle) | Out-Null
-              }
-            }
-          }
+      - name: Test DLL Loading (After Runtime Copy)
+        working-directory: build
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\workflows\test-dll-load.ps1" -BinDirectory "$(Get-Location)\bin"
 
       - name: Run Tests
         working-directory: build
-        run: |
-          Write-Host "=== Running from directory: $(Get-Location) ==="
-
-          # Find Visual Studio x86 runtime DLLs directory
-          $vsPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC"
-          $msvcVersion = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
-          $x86BinPath = Join-Path $msvcVersion.FullName "bin\Hostx86\x86"
-
-          Write-Host "Visual Studio x86 bin path: $x86BinPath"
-
-          # Add both bin directory and VS x86 runtime to PATH
-          $env:PATH = "$(Get-Location)\bin;$x86BinPath;$env:PATH"
-          Write-Host "Updated PATH to include bin and VS x86 runtime"
-
-          ctest -C Release --output-on-failure --no-tests=error
+        run: ctest -C Release --output-on-failure --no-tests=error
 
       # Do Srclinting
       - name: Get Changed Files (Src)
