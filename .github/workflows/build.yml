@@ -128,7 +128,15 @@ jobs:
 
       - name: Run Tests
         working-directory: build
-        run: ctest -C Release --output-on-failure --no-tests=error
+        run: |
+          Write-Host "PATH when running tests:"
+          Write-Host $env:PATH
+          Write-Host "`nChecking if runtime DLLs are in PATH:"
+          where.exe msvcp140.dll
+          where.exe vcruntime140.dll
+          where.exe msvcp140_atomic_wait.dll
+
+          ctest -C Release --output-on-failure --no-tests=error
 
       # Do Srclinting
       - name: Get Changed Files (Src)
