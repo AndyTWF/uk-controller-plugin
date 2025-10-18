@@ -3,15 +3,15 @@ name: Build
 on:
   push:
     branches:
-      - 'main'
-      - 'alpha'
-      - 'beta'
+      - "main"
+      - "alpha"
+      - "beta"
   pull_request:
 
 jobs:
   build:
     name: Build
-    runs-on: windows-2019
+    runs-on: windows-2025
     concurrency:
       group: ukcp-build-${{ github.ref }}
       cancel-in-progress: true
@@ -22,6 +22,24 @@ jobs:
           submodules: recursive
 
       # Environment things
+      - name: Install Visual C++ 2010 Redistributable (x86)
+        run: |
+          Write-Host "Downloading Visual C++ 2010 Redistributable (x86)..."
+          $url = "https://download.microsoft.com/download/1/6/5/165255E7-1014-4D0A-B094-B6A430A6BFFC/vcredist_x86.exe"
+          $output = "vcredist_x86_2010.exe"
+          Invoke-WebRequest -Uri $url -OutFile $output
+
+          Write-Host "Installing Visual C++ 2010 Redistributable..."
+          Start-Process -FilePath $output -ArgumentList "/install", "/quiet", "/norestart" -Wait -NoNewWindow
+
+          Write-Host "Installation complete. Checking for DLLs..."
+          if (Test-Path "$env:WINDIR\SysWOW64\MSVCR100.dll") {
+            Write-Host "MSVCR100.dll found!" -ForegroundColor Green
+          }
+          if (Test-Path "$env:WINDIR\SysWOW64\mfc100.dll") {
+            Write-Host "mfc100.dll found!" -ForegroundColor Green
+          }
+
       - name: Set up Visual Studio Shell
         uses: egor-tensin/vs-shell@v2
         with:
@@ -47,14 +65,14 @@ jobs:
           CURL_DOWNLOAD_URL: "https://github.com/curl/curl/releases/download/curl-7_76_1/curl-7.76.1.zip"
           CURL_VERSION: 7.76.1
         run: |
-            New-Item -Path "C:\\hostedtoolcache\\windows" -Name "libcurl" -ItemType "directory"
-            $WebClient = New-Object System.Net.WebClient
-            $WebClient.DownloadFile(${env:CURL_DOWNLOAD_URL}, "C:\\hostedtoolcache\\windows\\libcurl\\curl.zip")
-            Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl"
-            7z x curl.zip
-            Remove-Item curl.zip
-            Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl\\curl-${env:CURL_VERSION}\\winbuild"
-            nmake /f Makefile.vc mode=static ENABLE_SCHANNEL=yes
+          New-Item -Path "C:\\hostedtoolcache\\windows" -Name "libcurl" -ItemType "directory"
+          $WebClient = New-Object System.Net.WebClient
+          $WebClient.DownloadFile(${env:CURL_DOWNLOAD_URL}, "C:\\hostedtoolcache\\windows\\libcurl\\curl.zip")
+          Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl"
+          7z x curl.zip
+          Remove-Item curl.zip
+          Set-Location -Path "C:\\hostedtoolcache\\windows\\libcurl\\curl-${env:CURL_VERSION}\\winbuild"
+          nmake /f Makefile.vc mode=static ENABLE_SCHANNEL=yes
 
       - name: Setup cURL Environment
         env:
@@ -67,7 +85,7 @@ jobs:
       - name: Setup Yarn
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: "16"
 
       - name: Get Yarn Cache Directory
         id: yarn-cache-dir-path
@@ -85,7 +103,7 @@ jobs:
       - name: Load Cached Node Modules
         uses: actions/cache@v4
         with:
-          path: '**/node_modules'
+          path: "**/node_modules"
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
 
       # Install yarn things
@@ -110,9 +128,254 @@ jobs:
         working-directory: build
         run: ninja
 
+      - name: Download ProcDump
+        run: |
+          Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Procdump.zip" -OutFile "Procdump.zip"
+          Expand-Archive Procdump.zip -DestinationPath procdump -Force
+          Write-Host "ProcDump downloaded and extracted"
+
+      - name: Make diagnostic folders
+        run: |
+          New-Item -ItemType Directory -Force dumps | Out-Null
+          New-Item -ItemType Directory -Force logs | Out-Null
+
+      - name: Run test with ProcDump to capture crash
+        working-directory: build
+        continue-on-error: true
+        run: |
+          # Use 32-bit procdump for 32-bit test executable
+          # -e = dump on unhandled exception, -ma = full dump, -x = write dumps to folder
+          $testExe = Resolve-Path ".\bin\UKControllerPluginCoreTest.exe"
+          $dumpDir = Resolve-Path "..\dumps"
+
+          Write-Host "Running: $testExe"
+          Write-Host "Dump directory: $dumpDir"
+
+          & ..\procdump\procdump.exe -accepteula -e -ma -x $dumpDir $testExe --gtest_list_tests
+          $exitCode = $LASTEXITCODE
+          Write-Host "Test exit code: $exitCode (0x$($exitCode.ToString('X8')))"
+          "ExitCode=$exitCode" | Out-File ..\logs\exit-code.txt
+
+      - name: Collect Application Event Logs
+        if: always()
+        run: |
+          $since = (Get-Date).AddMinutes(-30)
+          $events = Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$since} -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -in @('Application Error','Windows Error Reporting','SideBySide') }
+
+          Write-Host "=== Application Events Related to Test ==="
+          $events | Format-List * | Out-File .\logs\application-events.txt -Encoding UTF8
+
+          # Look specifically for DLL load failures
+          Write-Host "`n=== Searching for DLL load failure messages ==="
+          $events | Where-Object { $_.Message -like "*UKControllerPluginCoreTest*" -or $_.Message -like "*0xc0000135*" } | ForEach-Object {
+            Write-Host "Event ID: $($_.Id)"
+            Write-Host "Message: $($_.Message)"
+            Write-Host "---"
+          } | Tee-Object -FilePath .\logs\dll-load-errors.txt
+
+      - name: Dump static dependencies
+        if: always()
+        working-directory: build
+        run: |
+          Write-Host "=== UKControllerPluginCoreTest.exe dependencies ==="
+          dumpbin /HEADERS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-core-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-core-dependents.txt -Encoding UTF8
+
+          Write-Host "=== UKControllerPluginUtilsTest.exe dependencies ==="
+          dumpbin /HEADERS bin\UKControllerPluginUtilsTest.exe | Out-File ..\logs\test-utils-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginUtilsTest.exe | Out-File ..\logs\test-utils-dependents.txt -Encoding UTF8
+
+          Write-Host "=== UKControllerPluginLoaderTest.exe dependencies ==="
+          dumpbin /HEADERS bin\UKControllerPluginLoaderTest.exe | Out-File ..\logs\test-loader-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginLoaderTest.exe | Out-File ..\logs\test-loader-dependents.txt -Encoding UTF8
+
+          Write-Host "=== UKControllerPluginCore.dll dependencies ==="
+          dumpbin /DEPENDENTS bin\UKControllerPluginCore.dll | Out-File ..\logs\core-dependents.txt -Encoding UTF8
+
+          Write-Host "=== EuroScopePlugInDll.dll dependencies ==="
+          dumpbin /DEPENDENTS bin\EuroScopePlugInDll.dll | Out-File ..\logs\euroscope-dependents.txt -Encoding UTF8
+
+          Write-Host "`n=== Comparing test executable dependencies ==="
+          Write-Host "`nCoreTest dependencies:"
+          dumpbin /DEPENDENTS bin\UKControllerPluginCoreTest.exe | Select-String "\.dll"
+          Write-Host "`nUtilsTest dependencies:"
+          dumpbin /DEPENDENTS bin\UKControllerPluginUtilsTest.exe | Select-String "\.dll"
+          Write-Host "`nLoaderTest dependencies:"
+          dumpbin /DEPENDENTS bin\UKControllerPluginLoaderTest.exe | Select-String "\.dll"
+
+      - name: Check DLL presence in PATH
+        if: always()
+        working-directory: build
+        run: |
+          $dlls = Select-String -Path ..\logs\test-core-dependents.txt -Pattern '\.dll' | ForEach-Object {
+            ($_.Line -split '\s+') | Where-Object { $_ -match '\.dll$' } | ForEach-Object { $_.Trim() }
+          } | Sort-Object -Unique
+
+          $report = foreach ($d in $dlls) {
+            # Check bin directory first
+            $inBin = Test-Path "bin\$d"
+            $found = $null
+            if (-not $inBin) {
+              $found = @(Get-ChildItem -Path "$env:WINDIR\System32","$env:WINDIR\SysWOW64" `
+                -Filter $d -ErrorAction SilentlyContinue) | Select-Object -First 1
+            }
+            [PSCustomObject]@{
+              DLL=$d
+              InBin=$inBin
+              InSystem=([bool]$found)
+              Path=$(if ($inBin) { "bin\" } elseif ($found) { $found.FullName } else { "NOT FOUND" })
+            }
+          }
+          $report | Format-Table -AutoSize | Out-String | Tee-Object -FilePath ..\logs\dll-presence-check.txt
+
+          Write-Host "`n=== Checking for specific legacy DLLs ==="
+          $legacyDlls = @('mfc100.dll', 'MSVCR100.dll', 'KERNEL32.dll', 'WSOCK32.dll')
+          foreach ($dll in $legacyDlls) {
+            Write-Host "`nChecking $dll :"
+
+            # Check in bin
+            if (Test-Path "bin\$dll") {
+              Write-Host "  FOUND in bin directory" -ForegroundColor Green
+              continue
+            }
+
+            # Check in System32
+            if (Test-Path "$env:WINDIR\System32\$dll") {
+              Write-Host "  FOUND in System32" -ForegroundColor Green
+              continue
+            }
+
+            # Check in SysWOW64 (32-bit DLLs on 64-bit Windows)
+            if (Test-Path "$env:WINDIR\SysWOW64\$dll") {
+              Write-Host "  FOUND in SysWOW64 (32-bit)" -ForegroundColor Green
+              continue
+            }
+
+            # Try where.exe
+            $found = where.exe $dll 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "  FOUND in PATH at: $($found -split "`n" | Select-Object -First 1)" -ForegroundColor Green
+            } else {
+              Write-Host "  NOT FOUND ANYWHERE" -ForegroundColor Red
+            }
+          }
+
+      - name: Trace SxS load (sxstrace)
+        if: always()
+        working-directory: build
+        continue-on-error: true
+        run: |
+          $exe = ".\bin\UKControllerPluginCoreTest.exe"
+          Write-Host "Starting SxS trace for: $exe"
+
+          # Start sxstrace in background
+          $sxsProcess = Start-Process -FilePath "sxstrace" -ArgumentList "trace","-logfile:..\sxs.etl" -PassThru -NoNewWindow
+
+          # Wait a moment for trace to start
+          Start-Sleep -Seconds 2
+
+          # Run the test executable
+          Write-Host "Running test executable..."
+          cmd /c "$exe --gtest_list_tests" 2>&1 | Tee-Object -FilePath ..\app_stderr.txt
+
+          # Wait a moment to ensure trace captures everything
+          Start-Sleep -Seconds 5
+
+          # Stop the trace by killing the process (since we can't send Enter)
+          Write-Host "Stopping SxS trace..."
+          Stop-Process -Id $sxsProcess.Id -Force -ErrorAction SilentlyContinue
+
+          # Parse the trace
+          Write-Host "Parsing SxS trace..."
+          sxstrace parse -logfile:..\sxs.etl -outfile:..\sxs.txt
+
+          Write-Host "`n=== SxS Trace Output ==="
+          if (Test-Path ..\sxs.txt) {
+            type ..\sxs.txt
+          } else {
+            Write-Host "No SxS trace output generated"
+          }
+
+      - name: Upload sxstrace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sxs-trace
+          path: |
+            sxs.etl
+            sxs.txt
+            app_stderr.txt
+
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-logs
+          path: |
+            logs/
+            dumps/
+
+      - name: Copy ALL Runtime DLLs to bin directory
+        working-directory: build
+        run: |
+          Write-Host "Copying Visual C++ 32-bit runtime DLLs to bin directory..."
+          $vsPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC"
+          $msvcVersion = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
+          $x86RuntimePath = Join-Path $msvcVersion.FullName "bin\Hostx86\x86"
+
+          Write-Host "Source: $x86RuntimePath"
+          Write-Host "Available runtime DLLs in VS directory:"
+          Get-ChildItem "$x86RuntimePath\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
+
+          # Copy ALL msvcp and vcruntime DLLs
+          Write-Host "`nCopying ALL runtime DLLs..."
+          Get-ChildItem "$x86RuntimePath\msvcp*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "bin\" -Force
+            Write-Host "  Copied $($_.Name)"
+          }
+          Get-ChildItem "$x86RuntimePath\vcruntime*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "bin\" -Force
+            Write-Host "  Copied $($_.Name)"
+          }
+          Get-ChildItem "$x86RuntimePath\concrt*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "bin\" -Force
+            Write-Host "  Copied $($_.Name)"
+          }
+
+          Write-Host "`nDLL files now in bin directory:"
+          Get-ChildItem "bin\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
+
+          Write-Host "`nTesting if test can now run with all runtime DLLs copied..."
+          Write-Host "Attempting to run test executable directly from cmd.exe..."
+
+          # Change to bin directory so DLLs are in same directory as exe
+          Push-Location bin
+          $output = cmd /c "UKControllerPluginCoreTest.exe --gtest_list_tests 2>&1"
+          $exitCode = $LASTEXITCODE
+          Pop-Location
+
+          Write-Host "Exit Code: $exitCode (0x$($exitCode.ToString('X8')))"
+          if ($exitCode -eq 0) {
+            Write-Host "SUCCESS! Test executable ran successfully!" -ForegroundColor Green
+            Write-Host "Output:"
+            Write-Host $output
+          } else {
+            Write-Host "FAILED! Still getting error 0x$($exitCode.ToString('X8'))" -ForegroundColor Red
+            Write-Host "Output:"
+            Write-Host $output
+          }
+
       - name: Run Tests
         working-directory: build
         run: |
+          Write-Host "PATH when running tests:"
+          Write-Host $env:PATH
+          Write-Host "`nChecking if runtime DLLs are in PATH:"
+          where.exe msvcp140.dll
+          where.exe vcruntime140.dll
+          where.exe msvcp140_atomic_wait.dll
+
           ctest -C Release --output-on-failure --no-tests=error
 
       # Do Srclinting
@@ -196,7 +459,7 @@ jobs:
       - name: Setup Yarn
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: "16"
 
       - name: Get Yarn Cache Directory
         id: yarn-cache-dir-path
@@ -214,7 +477,7 @@ jobs:
       - name: Load Cached Node Modules
         uses: actions/cache@v4
         with:
-          path: '**/node_modules'
+          path: "**/node_modules"
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
 
       # Install yarn things
