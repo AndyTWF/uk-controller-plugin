@@ -195,6 +195,30 @@ jobs:
           }
           $report | Format-Table -AutoSize | Out-String | Tee-Object -FilePath ..\logs\dll-presence-check.txt
 
+      - name: Trace SxS load (sxstrace)
+        if: always()
+        working-directory: build
+        continue-on-error: true
+        run: |
+          $exe = ".\bin\UKControllerPluginCoreTest.exe"
+          Write-Host "Starting SxS trace for: $exe"
+          sxstrace trace -logfile:..\sxs.etl
+          cmd /c "$exe --gtest_list_tests" 2>&1 | Tee-Object -FilePath ..\app_stderr.txt
+          sxstrace stoptrace
+          sxstrace parse -logfile:..\sxs.etl -outfile:..\sxs.txt
+          Write-Host "`n=== SxS Trace Output ==="
+          type ..\sxs.txt
+
+      - name: Upload sxstrace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sxs-trace
+          path: |
+            sxs.etl
+            sxs.txt
+            app_stderr.txt
+
       - name: Upload diagnostic logs
         if: always()
         uses: actions/upload-artifact@v4
