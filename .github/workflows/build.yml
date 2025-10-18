@@ -110,6 +110,85 @@ jobs:
         working-directory: build
         run: ninja
 
+      - name: Download ProcDump
+        run: |
+          Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Procdump.zip" -OutFile "Procdump.zip"
+          Expand-Archive Procdump.zip -DestinationPath procdump -Force
+          Write-Host "ProcDump downloaded and extracted"
+
+      - name: Make diagnostic folders
+        run: |
+          New-Item -ItemType Directory -Force dumps | Out-Null
+          New-Item -ItemType Directory -Force logs | Out-Null
+
+      - name: Run test with ProcDump to capture crash
+        working-directory: build
+        continue-on-error: true
+        run: |
+          # Use 32-bit procdump for 32-bit test executable
+          # -e = dump on unhandled exception, -ma = full dump, -x = write dumps to folder
+          ..\procdump\procdump.exe -accepteula -e -ma -x "..\dumps" -- `
+            ".\bin\UKControllerPluginCoreTest.exe" --gtest_list_tests
+          $exitCode = $LASTEXITCODE
+          Write-Host "Test exit code: $exitCode (0x$($exitCode.ToString('X8')))"
+          "ExitCode=$exitCode" | Out-File ..\logs\exit-code.txt
+
+      - name: Collect Application Event Logs
+        if: always()
+        run: |
+          $since = (Get-Date).AddMinutes(-30)
+          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$since} -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -in @('Application Error','Windows Error Reporting','SideBySide') } |
+            Format-List * | Out-File .\logs\application-events.txt -Encoding UTF8
+
+      - name: Dump static dependencies
+        if: always()
+        working-directory: build
+        run: |
+          Write-Host "=== UKControllerPluginCoreTest.exe dependencies ==="
+          dumpbin /HEADERS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-dependents.txt -Encoding UTF8
+
+          Write-Host "=== UKControllerPluginCore.dll dependencies ==="
+          dumpbin /DEPENDENTS bin\UKControllerPluginCore.dll | Out-File ..\logs\core-dependents.txt -Encoding UTF8
+
+          Write-Host "=== EuroScopePlugInDll.dll dependencies ==="
+          dumpbin /DEPENDENTS bin\EuroScopePlugInDll.dll | Out-File ..\logs\euroscope-dependents.txt -Encoding UTF8
+
+      - name: Check DLL presence in PATH
+        if: always()
+        working-directory: build
+        run: |
+          $dlls = Select-String -Path ..\logs\test-dependents.txt -Pattern '\.dll' | ForEach-Object {
+            ($_.Line -split '\s+') | Where-Object { $_ -match '\.dll$' } | ForEach-Object { $_.Trim() }
+          } | Sort-Object -Unique
+
+          $report = foreach ($d in $dlls) {
+            # Check bin directory first
+            $inBin = Test-Path "bin\$d"
+            $found = $null
+            if (-not $inBin) {
+              $found = @(Get-ChildItem -Path "$env:WINDIR\System32","$env:WINDIR\SysWOW64" `
+                -Filter $d -ErrorAction SilentlyContinue) | Select-Object -First 1
+            }
+            [PSCustomObject]@{
+              DLL=$d
+              InBin=$inBin
+              InSystem=([bool]$found)
+              Path=$(if ($inBin) { "bin\" } elseif ($found) { $found.FullName } else { "NOT FOUND" })
+            }
+          }
+          $report | Format-Table -AutoSize | Out-String | Tee-Object -FilePath ..\logs\dll-presence-check.txt
+
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-logs
+          path: |
+            logs/
+            dumps/
+
       - name: Copy Runtime DLLs to bin directory
         working-directory: build
         run: |
