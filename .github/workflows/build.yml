@@ -115,40 +115,41 @@ jobs:
         run: |
           Write-Host "=== Checking DLL dependencies and availability ==="
 
-          # List DLLs in bin directory
-          Write-Host "`nDLLs in bin directory:"
-          Get-ChildItem bin\*.dll | ForEach-Object { Write-Host "  $($_.Name)" }
+          # List files in bin directory
+          Write-Host "`nFiles in bin directory:"
+          Get-ChildItem bin\* | ForEach-Object { Write-Host "  $($_.Name)" }
+
+          # Check if EuroScopePlugInDll.dll exists in bin
+          if (Test-Path "bin\EuroScopePlugInDll.dll") {
+            Write-Host "`nEuroScopePlugInDll.dll : EXISTS in bin directory" -ForegroundColor Green
+          } else {
+            Write-Host "`nEuroScopePlugInDll.dll : MISSING from bin directory" -ForegroundColor Red
+          }
 
           # Check UKControllerPluginCoreTest.exe dependencies
           Write-Host "`n=== UKControllerPluginCoreTest.exe dependencies ==="
           dumpbin /dependents bin\UKControllerPluginCoreTest.exe
 
-          # Check UKControllerPluginCore.dll dependencies
-          Write-Host "`n=== UKControllerPluginCore.dll dependencies ==="
-          dumpbin /dependents bin\UKControllerPluginCore.dll
+          # Parse and check all dependencies from the test executable
+          Write-Host "`n=== Checking if all test dependencies are available ==="
+          $testDeps = dumpbin /dependents bin\UKControllerPluginCoreTest.exe | Select-String "\.dll" | ForEach-Object { $_.Line.Trim() }
 
-          # Check UKControllerPluginUtils.dll dependencies
-          Write-Host "`n=== UKControllerPluginUtils.dll dependencies ==="
-          dumpbin /dependents bin\UKControllerPluginUtils.dll
-
-          # Use dependency walker alternative - check with where.exe
-          Write-Host "`n=== Checking system DLL locations ==="
-          @('EuroScopePlugInDll.dll', 'gdiplus.dll', 'MSVCP140.dll', 'VCRUNTIME140.dll', 'MSVCP140_ATOMIC_WAIT.dll') | ForEach-Object {
-            $dll = $_
-            try {
-              $location = where.exe $dll 2>&1
-              if ($LASTEXITCODE -eq 0) {
-                Write-Host "  $dll : FOUND at $location"
+          foreach ($dll in $testDeps) {
+            if ($dll -match "^[\w\-]+\.dll$") {
+              # First check in bin directory
+              if (Test-Path "bin\$dll") {
+                Write-Host "  $dll : FOUND in bin directory" -ForegroundColor Green
               } else {
-                Write-Host "  $dll : NOT FOUND in PATH" -ForegroundColor Red
+                # Check in system PATH
+                $location = where.exe $dll 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "  $dll : FOUND in system PATH"
+                } else {
+                  Write-Host "  $dll : NOT FOUND" -ForegroundColor Red
+                }
               }
-            } catch {
-              Write-Host "  $dll : NOT FOUND (exception)" -ForegroundColor Red
             }
           }
-
-          Write-Host "`n=== Current PATH ==="
-          Write-Host $env:PATH
 
       - name: Run Tests
         working-directory: build
