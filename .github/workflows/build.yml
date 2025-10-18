@@ -133,19 +133,22 @@ jobs:
 
           # Use dependency walker alternative - check with where.exe
           Write-Host "`n=== Checking system DLL locations ==="
-          @('DWMAPI.dll', 'gdiplus.dll', 'comctl32.dll', 'MSVCP140.dll', 'VCRUNTIME140.dll', 'MSVCP140_ATOMIC_WAIT.dll') | ForEach-Object {
+          @('EuroScopePlugInDll.dll', 'gdiplus.dll', 'MSVCP140.dll', 'VCRUNTIME140.dll', 'MSVCP140_ATOMIC_WAIT.dll') | ForEach-Object {
             $dll = $_
             try {
-              $location = where.exe $dll 2>$null
-              if ($location) {
-                Write-Host "  $dll : FOUND"
+              $location = where.exe $dll 2>&1
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "  $dll : FOUND at $location"
               } else {
-                Write-Host "  $dll : NOT FOUND in PATH"
+                Write-Host "  $dll : NOT FOUND in PATH" -ForegroundColor Red
               }
             } catch {
-              Write-Host "  $dll : NOT FOUND"
+              Write-Host "  $dll : NOT FOUND (exception)" -ForegroundColor Red
             }
           }
+
+          Write-Host "`n=== Current PATH ==="
+          Write-Host $env:PATH
 
       - name: Run Tests
         working-directory: build
