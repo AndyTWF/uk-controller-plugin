@@ -202,12 +202,34 @@ jobs:
         run: |
           $exe = ".\bin\UKControllerPluginCoreTest.exe"
           Write-Host "Starting SxS trace for: $exe"
-          sxstrace trace -logfile:..\sxs.etl
+
+          # Start sxstrace in background
+          $sxsProcess = Start-Process -FilePath "sxstrace" -ArgumentList "trace","-logfile:..\sxs.etl" -PassThru -NoNewWindow
+
+          # Wait a moment for trace to start
+          Start-Sleep -Seconds 2
+
+          # Run the test executable
+          Write-Host "Running test executable..."
           cmd /c "$exe --gtest_list_tests" 2>&1 | Tee-Object -FilePath ..\app_stderr.txt
-          sxstrace stoptrace
+
+          # Wait a moment to ensure trace captures everything
+          Start-Sleep -Seconds 2
+
+          # Stop the trace by killing the process (since we can't send Enter)
+          Write-Host "Stopping SxS trace..."
+          Stop-Process -Id $sxsProcess.Id -Force -ErrorAction SilentlyContinue
+
+          # Parse the trace
+          Write-Host "Parsing SxS trace..."
           sxstrace parse -logfile:..\sxs.etl -outfile:..\sxs.txt
+
           Write-Host "`n=== SxS Trace Output ==="
-          type ..\sxs.txt
+          if (Test-Path ..\sxs.txt) {
+            type ..\sxs.txt
+          } else {
+            Write-Host "No SxS trace output generated"
+          }
 
       - name: Upload sxstrace
         if: always()
