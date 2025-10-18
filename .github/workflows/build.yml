@@ -140,18 +140,33 @@ jobs:
               if (Test-Path "bin\$dll") {
                 Write-Host "  $dll : FOUND in bin directory" -ForegroundColor Green
               } else {
-                # Check in system PATH and verify it's 32-bit
+                # Check in system PATH and verify architectures
                 $locations = where.exe $dll 2>&1
                 if ($LASTEXITCODE -eq 0) {
-                  $firstLocation = ($locations -split "`n")[0]
-                  # Check if it's 32-bit using dumpbin
-                  $dumpOutput = dumpbin /headers $firstLocation 2>&1 | Select-String "machine"
-                  if ($dumpOutput -match "x86") {
-                    Write-Host "  $dll : FOUND in system PATH (32-bit) at $firstLocation" -ForegroundColor Green
-                  } elseif ($dumpOutput -match "x64") {
-                    Write-Host "  $dll : FOUND but is 64-bit at $firstLocation" -ForegroundColor Yellow
-                  } else {
-                    Write-Host "  $dll : FOUND at $firstLocation (architecture unknown)"
+                  $allLocations = ($locations -split "`n") | Where-Object { $_ -match "\.dll$" }
+                  $found32bit = $false
+                  $found64bit = $false
+
+                  foreach ($location in $allLocations) {
+                    # Check if it's 32-bit using dumpbin
+                    $dumpOutput = dumpbin /headers $location 2>&1 | Select-String "machine"
+                    if ($dumpOutput -match "\(x86\)") {
+                      if (-not $found32bit) {
+                        Write-Host "  $dll : FOUND 32-bit at $location" -ForegroundColor Green
+                        $found32bit = $true
+                      }
+                    } elseif ($dumpOutput -match "x64") {
+                      if (-not $found64bit) {
+                        Write-Host "  $dll : FOUND 64-bit at $location" -ForegroundColor Yellow
+                        $found64bit = $true
+                      }
+                    }
+                  }
+
+                  if (-not $found32bit -and -not $found64bit) {
+                    Write-Host "  $dll : FOUND but architecture unknown at $($allLocations[0])"
+                  } elseif (-not $found32bit) {
+                    Write-Host "  $dll : WARNING - Only 64-bit version found, 32-bit needed!" -ForegroundColor Red
                   }
                 } else {
                   Write-Host "  $dll : NOT FOUND" -ForegroundColor Red
@@ -202,6 +217,15 @@ jobs:
       - name: Run Tests
         working-directory: build
         run: |
+          Write-Host "=== Running from directory: $(Get-Location) ==="
+          Write-Host "=== PATH at test time ==="
+          Write-Host $env:PATH
+
+          # Add bin directory to PATH so DLLs can be found
+          $env:PATH = "$(Get-Location)\bin;$env:PATH"
+          Write-Host "`n=== Updated PATH ==="
+          Write-Host $env:PATH
+
           ctest -C Release --output-on-failure --no-tests=error
 
       # Do Srclinting
