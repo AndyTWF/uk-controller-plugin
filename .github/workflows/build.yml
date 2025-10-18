@@ -22,6 +22,24 @@ jobs:
           submodules: recursive
 
       # Environment things
+      - name: Install Visual C++ 2010 Redistributable (x86)
+        run: |
+          Write-Host "Downloading Visual C++ 2010 Redistributable (x86)..."
+          $url = "https://download.microsoft.com/download/1/6/5/165255E7-1014-4D0A-B094-B6A430A6BFFC/vcredist_x86.exe"
+          $output = "vcredist_x86_2010.exe"
+          Invoke-WebRequest -Uri $url -OutFile $output
+
+          Write-Host "Installing Visual C++ 2010 Redistributable..."
+          Start-Process -FilePath $output -ArgumentList "/install", "/quiet", "/norestart" -Wait -NoNewWindow
+
+          Write-Host "Installation complete. Checking for DLLs..."
+          if (Test-Path "$env:WINDIR\SysWOW64\MSVCR100.dll") {
+            Write-Host "MSVCR100.dll found!" -ForegroundColor Green
+          }
+          if (Test-Path "$env:WINDIR\SysWOW64\mfc100.dll") {
+            Write-Host "mfc100.dll found!" -ForegroundColor Green
+          }
+
       - name: Set up Visual Studio Shell
         uses: egor-tensin/vs-shell@v2
         with:
