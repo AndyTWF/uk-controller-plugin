@@ -142,9 +142,19 @@ jobs:
         if: always()
         run: |
           $since = (Get-Date).AddMinutes(-30)
-          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$since} -ErrorAction SilentlyContinue |
-            Where-Object { $_.ProviderName -in @('Application Error','Windows Error Reporting','SideBySide') } |
-            Format-List * | Out-File .\logs\application-events.txt -Encoding UTF8
+          $events = Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$since} -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -in @('Application Error','Windows Error Reporting','SideBySide') }
+
+          Write-Host "=== Application Events Related to Test ==="
+          $events | Format-List * | Out-File .\logs\application-events.txt -Encoding UTF8
+
+          # Look specifically for DLL load failures
+          Write-Host "`n=== Searching for DLL load failure messages ==="
+          $events | Where-Object { $_.Message -like "*UKControllerPluginCoreTest*" -or $_.Message -like "*0xc0000135*" } | ForEach-Object {
+            Write-Host "Event ID: $($_.Id)"
+            Write-Host "Message: $($_.Message)"
+            Write-Host "---"
+          } | Tee-Object -FilePath .\logs\dll-load-errors.txt
 
       - name: Dump static dependencies
         if: always()
@@ -194,7 +204,7 @@ jobs:
             logs/
             dumps/
 
-      - name: Copy Runtime DLLs to bin directory
+      - name: Copy ALL Runtime DLLs to bin directory
         working-directory: build
         run: |
           Write-Host "Copying Visual C++ 32-bit runtime DLLs to bin directory..."
@@ -202,12 +212,26 @@ jobs:
           $msvcVersion = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
           $x86RuntimePath = Join-Path $msvcVersion.FullName "bin\Hostx86\x86"
 
-          Copy-Item "$x86RuntimePath\msvcp140.dll" "bin\" -Force
-          Copy-Item "$x86RuntimePath\vcruntime140.dll" "bin\" -Force
-          Copy-Item "$x86RuntimePath\msvcp140_atomic_wait.dll" "bin\" -Force
+          Write-Host "Source: $x86RuntimePath"
+          Write-Host "Available runtime DLLs in VS directory:"
+          Get-ChildItem "$x86RuntimePath\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
 
-          Write-Host "Copied msvcp140.dll, vcruntime140.dll, msvcp140_atomic_wait.dll"
-          Write-Host "Files in bin directory:"
+          # Copy ALL msvcp and vcruntime DLLs
+          Write-Host "`nCopying ALL runtime DLLs..."
+          Get-ChildItem "$x86RuntimePath\msvcp*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "bin\" -Force
+            Write-Host "  Copied $($_.Name)"
+          }
+          Get-ChildItem "$x86RuntimePath\vcruntime*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "bin\" -Force
+            Write-Host "  Copied $($_.Name)"
+          }
+          Get-ChildItem "$x86RuntimePath\concrt*.dll" | ForEach-Object {
+            Copy-Item $_.FullName "bin\" -Force
+            Write-Host "  Copied $($_.Name)"
+          }
+
+          Write-Host "`nDLL files now in bin directory:"
           Get-ChildItem "bin\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
 
       - name: Run Tests
