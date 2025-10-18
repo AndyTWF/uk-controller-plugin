@@ -161,8 +161,16 @@ jobs:
         working-directory: build
         run: |
           Write-Host "=== UKControllerPluginCoreTest.exe dependencies ==="
-          dumpbin /HEADERS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-headers.txt -Encoding UTF8
-          dumpbin /DEPENDENTS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-dependents.txt -Encoding UTF8
+          dumpbin /HEADERS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-core-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginCoreTest.exe | Out-File ..\logs\test-core-dependents.txt -Encoding UTF8
+
+          Write-Host "=== UKControllerPluginUtilsTest.exe dependencies ==="
+          dumpbin /HEADERS bin\UKControllerPluginUtilsTest.exe | Out-File ..\logs\test-utils-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginUtilsTest.exe | Out-File ..\logs\test-utils-dependents.txt -Encoding UTF8
+
+          Write-Host "=== UKControllerPluginLoaderTest.exe dependencies ==="
+          dumpbin /HEADERS bin\UKControllerPluginLoaderTest.exe | Out-File ..\logs\test-loader-headers.txt -Encoding UTF8
+          dumpbin /DEPENDENTS bin\UKControllerPluginLoaderTest.exe | Out-File ..\logs\test-loader-dependents.txt -Encoding UTF8
 
           Write-Host "=== UKControllerPluginCore.dll dependencies ==="
           dumpbin /DEPENDENTS bin\UKControllerPluginCore.dll | Out-File ..\logs\core-dependents.txt -Encoding UTF8
@@ -170,11 +178,19 @@ jobs:
           Write-Host "=== EuroScopePlugInDll.dll dependencies ==="
           dumpbin /DEPENDENTS bin\EuroScopePlugInDll.dll | Out-File ..\logs\euroscope-dependents.txt -Encoding UTF8
 
+          Write-Host "`n=== Comparing test executable dependencies ==="
+          Write-Host "`nCoreTest dependencies:"
+          dumpbin /DEPENDENTS bin\UKControllerPluginCoreTest.exe | Select-String "\.dll"
+          Write-Host "`nUtilsTest dependencies:"
+          dumpbin /DEPENDENTS bin\UKControllerPluginUtilsTest.exe | Select-String "\.dll"
+          Write-Host "`nLoaderTest dependencies:"
+          dumpbin /DEPENDENTS bin\UKControllerPluginLoaderTest.exe | Select-String "\.dll"
+
       - name: Check DLL presence in PATH
         if: always()
         working-directory: build
         run: |
-          $dlls = Select-String -Path ..\logs\test-dependents.txt -Pattern '\.dll' | ForEach-Object {
+          $dlls = Select-String -Path ..\logs\test-core-dependents.txt -Pattern '\.dll' | ForEach-Object {
             ($_.Line -split '\s+') | Where-Object { $_ -match '\.dll$' } | ForEach-Object { $_.Trim() }
           } | Sort-Object -Unique
 
@@ -214,7 +230,7 @@ jobs:
           cmd /c "$exe --gtest_list_tests" 2>&1 | Tee-Object -FilePath ..\app_stderr.txt
 
           # Wait a moment to ensure trace captures everything
-          Start-Sleep -Seconds 2
+          Start-Sleep -Seconds 5
 
           # Stop the trace by killing the process (since we can't send Enter)
           Write-Host "Stopping SxS trace..."
@@ -279,6 +295,26 @@ jobs:
 
           Write-Host "`nDLL files now in bin directory:"
           Get-ChildItem "bin\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
+
+          Write-Host "`nTesting if test can now run with all runtime DLLs copied..."
+          Write-Host "Attempting to run test executable directly from cmd.exe..."
+
+          # Change to bin directory so DLLs are in same directory as exe
+          Push-Location bin
+          $output = cmd /c "UKControllerPluginCoreTest.exe --gtest_list_tests 2>&1"
+          $exitCode = $LASTEXITCODE
+          Pop-Location
+
+          Write-Host "Exit Code: $exitCode (0x$($exitCode.ToString('X8')))"
+          if ($exitCode -eq 0) {
+            Write-Host "SUCCESS! Test executable ran successfully!" -ForegroundColor Green
+            Write-Host "Output:"
+            Write-Host $output
+          } else {
+            Write-Host "FAILED! Still getting error 0x$($exitCode.ToString('X8'))" -ForegroundColor Red
+            Write-Host "Output:"
+            Write-Host $output
+          }
 
       - name: Run Tests
         working-directory: build
