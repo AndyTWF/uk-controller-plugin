@@ -131,7 +131,7 @@ jobs:
           dumpbin /dependents bin\UKControllerPluginCoreTest.exe
 
           # Parse and check all dependencies from the test executable
-          Write-Host "`n=== Checking if all test dependencies are available ==="
+          Write-Host "`n=== Checking if all test dependencies are available (32-bit) ==="
           $testDeps = dumpbin /dependents bin\UKControllerPluginCoreTest.exe | Select-String "\.dll" | ForEach-Object { $_.Line.Trim() }
 
           foreach ($dll in $testDeps) {
@@ -140,14 +140,35 @@ jobs:
               if (Test-Path "bin\$dll") {
                 Write-Host "  $dll : FOUND in bin directory" -ForegroundColor Green
               } else {
-                # Check in system PATH
-                $location = where.exe $dll 2>&1
+                # Check in system PATH and verify it's 32-bit
+                $locations = where.exe $dll 2>&1
                 if ($LASTEXITCODE -eq 0) {
-                  Write-Host "  $dll : FOUND in system PATH"
+                  $firstLocation = ($locations -split "`n")[0]
+                  # Check if it's 32-bit using dumpbin
+                  $dumpOutput = dumpbin /headers $firstLocation 2>&1 | Select-String "machine"
+                  if ($dumpOutput -match "x86") {
+                    Write-Host "  $dll : FOUND in system PATH (32-bit) at $firstLocation" -ForegroundColor Green
+                  } elseif ($dumpOutput -match "x64") {
+                    Write-Host "  $dll : FOUND but is 64-bit at $firstLocation" -ForegroundColor Yellow
+                  } else {
+                    Write-Host "  $dll : FOUND at $firstLocation (architecture unknown)"
+                  }
                 } else {
                   Write-Host "  $dll : NOT FOUND" -ForegroundColor Red
                 }
               }
+            }
+          }
+
+          Write-Host "`n=== Checking Visual Studio x86 bin directory ==="
+          $vsPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC"
+          if (Test-Path $vsPath) {
+            $msvcVersions = Get-ChildItem $vsPath | Sort-Object -Descending | Select-Object -First 1
+            $x86BinPath = Join-Path $msvcVersions.FullName "bin\Hostx86\x86"
+            Write-Host "VS x86 bin path: $x86BinPath"
+            if (Test-Path $x86BinPath) {
+              Write-Host "Contents:"
+              Get-ChildItem "$x86BinPath\*.dll" | ForEach-Object { Write-Host "  $($_.Name)" }
             }
           }
 
