@@ -211,6 +211,38 @@ jobs:
           }
           $report | Format-Table -AutoSize | Out-String | Tee-Object -FilePath ..\logs\dll-presence-check.txt
 
+          Write-Host "`n=== Checking for specific legacy DLLs ==="
+          $legacyDlls = @('mfc100.dll', 'MSVCR100.dll', 'KERNEL32.dll', 'WSOCK32.dll')
+          foreach ($dll in $legacyDlls) {
+            Write-Host "`nChecking $dll :"
+
+            # Check in bin
+            if (Test-Path "bin\$dll") {
+              Write-Host "  FOUND in bin directory" -ForegroundColor Green
+              continue
+            }
+
+            # Check in System32
+            if (Test-Path "$env:WINDIR\System32\$dll") {
+              Write-Host "  FOUND in System32" -ForegroundColor Green
+              continue
+            }
+
+            # Check in SysWOW64 (32-bit DLLs on 64-bit Windows)
+            if (Test-Path "$env:WINDIR\SysWOW64\$dll") {
+              Write-Host "  FOUND in SysWOW64 (32-bit)" -ForegroundColor Green
+              continue
+            }
+
+            # Try where.exe
+            $found = where.exe $dll 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "  FOUND in PATH at: $($found -split "`n" | Select-Object -First 1)" -ForegroundColor Green
+            } else {
+              Write-Host "  NOT FOUND ANYWHERE" -ForegroundColor Red
+            }
+          }
+
       - name: Trace SxS load (sxstrace)
         if: always()
         working-directory: build
