@@ -187,32 +187,44 @@ jobs:
             }
           }
 
-          Write-Host "`n=== Attempting to run test executable to capture error ==="
-          try {
-            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-            $pinfo.FileName = "bin\UKControllerPluginCoreTest.exe"
-            $pinfo.Arguments = "--gtest_list_tests"
-            $pinfo.RedirectStandardError = $true
-            $pinfo.RedirectStandardOutput = $true
-            $pinfo.UseShellExecute = $false
-            $p = New-Object System.Diagnostics.Process
-            $p.StartInfo = $pinfo
-            $started = $p.Start()
-            if (-not $started) {
-              Write-Host "Failed to start process"
-            }
-            $p.WaitForExit(5000) # Wait max 5 seconds
-            Write-Host "Exit code: $($p.ExitCode) (0x$($p.ExitCode.ToString('X')))"
-          } catch {
-            Write-Host "Exception trying to run test: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "Error code: 0x$($_.Exception.HResult.ToString('X8'))"
-          }
+          Write-Host "`n=== Testing DLL loading manually ==="
+          # Try to load each DLL that the test depends on
+          Add-Type @"
+            using System;
+            using System.Runtime.InteropServices;
+            public class DllLoader {
+                [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+                public static extern IntPtr LoadLibrary(string lpFileName);
 
-          Write-Host "`n=== Checking Windows Event Log for DLL errors ==="
-          Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='Application Error';StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
-            Where-Object { $_.Message -like "*UKControllerPluginCoreTest*" } |
-            Select-Object -First 5 |
-            ForEach-Object { Write-Host $_.Message }
+                [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+                public static extern bool FreeLibrary(IntPtr hModule);
+            }
+"@
+
+          # Test loading the main DLLs in order
+          $testDlls = @(
+            "bin\EuroScopePlugInDll.dll",
+            "bin\UKControllerPluginCore.dll"
+          )
+
+          foreach ($dllPath in $testDlls) {
+            $fullPath = Resolve-Path $dllPath -ErrorAction SilentlyContinue
+            if ($fullPath) {
+              Write-Host "Testing load: $fullPath"
+              $handle = [DllLoader]::LoadLibrary($fullPath)
+              if ($handle -eq [IntPtr]::Zero) {
+                $error = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                Write-Host "  FAILED to load: Error code $error (0x$($error.ToString('X')))" -ForegroundColor Red
+
+                # Common error codes
+                if ($error -eq 126) { Write-Host "    Error 126: The specified module could not be found (a dependency is missing)" }
+                if ($error -eq 127) { Write-Host "    Error 127: The specified procedure could not be found" }
+              } else {
+                Write-Host "  SUCCESS: Loaded successfully" -ForegroundColor Green
+                [DllLoader]::FreeLibrary($handle) | Out-Null
+              }
+            }
+          }
 
       - name: Run Tests
         working-directory: build
