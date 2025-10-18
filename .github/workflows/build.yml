@@ -172,6 +172,33 @@ jobs:
             }
           }
 
+          Write-Host "`n=== Attempting to run test executable to capture error ==="
+          try {
+            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+            $pinfo.FileName = "bin\UKControllerPluginCoreTest.exe"
+            $pinfo.Arguments = "--gtest_list_tests"
+            $pinfo.RedirectStandardError = $true
+            $pinfo.RedirectStandardOutput = $true
+            $pinfo.UseShellExecute = $false
+            $p = New-Object System.Diagnostics.Process
+            $p.StartInfo = $pinfo
+            $started = $p.Start()
+            if (-not $started) {
+              Write-Host "Failed to start process"
+            }
+            $p.WaitForExit(5000) # Wait max 5 seconds
+            Write-Host "Exit code: $($p.ExitCode) (0x$($p.ExitCode.ToString('X')))"
+          } catch {
+            Write-Host "Exception trying to run test: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Error code: 0x$($_.Exception.HResult.ToString('X8'))"
+          }
+
+          Write-Host "`n=== Checking Windows Event Log for DLL errors ==="
+          Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='Application Error';StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -like "*UKControllerPluginCoreTest*" } |
+            Select-Object -First 5 |
+            ForEach-Object { Write-Host $_.Message }
+
       - name: Run Tests
         working-directory: build
         run: |
